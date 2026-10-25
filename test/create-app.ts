@@ -1,13 +1,21 @@
-import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { INestApplication, type Type } from '@nestjs/common';
+import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/app.setup';
 
-export async function createTestApp(): Promise<INestApplication<App>> {
-  const moduleRef = await Test.createTestingModule({
-    imports: [AppModule],
-  }).compile();
+export interface TestAppOptions {
+  imports?: Type[];
+  override?: (builder: TestingModuleBuilder) => TestingModuleBuilder;
+}
+
+export async function createTestApp(
+  options: TestAppOptions = {},
+): Promise<INestApplication<App>> {
+  const builder = Test.createTestingModule({
+    imports: [AppModule, ...(options.imports ?? [])],
+  });
+  const moduleRef = await (options.override?.(builder) ?? builder).compile();
 
   const app = moduleRef.createNestApplication<INestApplication<App>>();
   configureApp(app);

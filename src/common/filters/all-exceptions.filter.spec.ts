@@ -58,6 +58,25 @@ describe('AllExceptionsFilter', () => {
     ).toEqual({ statusCode: 400, message: 'a is bad, b is bad' });
   });
 
+  it('keeps a code and field errors thrown on purpose', () => {
+    const { filter } = setup();
+
+    expect(
+      filter.toBody(
+        new BadRequestException({
+          message: 'Invalid or expired code',
+          code: 'INVALID_OTP',
+          errors: [{ field: 'code', message: 'Invalid or expired code' }],
+        }),
+      ),
+    ).toEqual({
+      statusCode: 400,
+      message: 'Invalid or expired code',
+      code: 'INVALID_OTP',
+      errors: [{ field: 'code', message: 'Invalid or expired code' }],
+    });
+  });
+
   it('turns a Zod validation error into field errors', () => {
     const { filter } = setup();
     const schema = z.object({ phone: z.string().min(10), name: z.string() });

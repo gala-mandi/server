@@ -19,6 +19,7 @@ export function configureApp(app: INestApplication): void {
       callback: (err: Error | null, allow?: boolean) => void,
     ) => callback(null, !origin || allowedOrigins.includes(origin)),
     credentials: true,
+    exposedHeaders: ['Retry-After', 'X-RateLimit-Remaining'],
   });
   app.enableShutdownHooks();
 

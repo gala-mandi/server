@@ -7,6 +7,7 @@ import { ZodValidationPipe } from 'nestjs-zod';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { type Env, validateEnv } from './config/env.schema';
 import { DatabaseModule } from './database/database.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -17,7 +18,11 @@ import { HealthModule } from './modules/health/health.module';
       useFactory: (config: ConfigService<Env, true>) => ({
         pinoHttp: {
           level: config.get('LOG_LEVEL'),
-          redact: ['req.headers.authorization', 'req.headers.cookie'],
+          redact: [
+            'req.headers.authorization',
+            'req.headers.cookie',
+            'res.headers["set-cookie"]',
+          ],
         },
       }),
     }),
@@ -35,6 +40,7 @@ import { HealthModule } from './modules/health/health.module';
     }),
     DatabaseModule,
     HealthModule,
+    AuthModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

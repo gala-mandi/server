@@ -20,6 +20,14 @@ export const envSchema = z.object({
   CORS_ORIGINS: commaSeparatedUrls,
   THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60_000),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
+  JWT_ACCESS_SECRET: z.string().min(32),
+  JWT_ACCESS_TTL_SEC: z.coerce.number().int().positive().default(900),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
+  // Set in production when web/admin and the API share a parent domain.
+  COOKIE_DOMAIN: z.string().min(1).optional(),
+  OTP_SECRET: z.string().min(32),
+  LOGIN_THROTTLE_LIMIT: z.coerce.number().int().positive().default(5),
+  LOGIN_THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60_000),
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
     .default('info'),

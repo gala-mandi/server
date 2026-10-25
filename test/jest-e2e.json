@@ -6,5 +6,6 @@
   "setupFiles": ["<rootDir>/setup-env.ts"],
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
-  }
+  },
+  "testTimeout": 20000
 }

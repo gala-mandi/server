@@ -3,6 +3,8 @@ import { validateEnv } from './env.schema';
 const validEnv = {
   DATABASE_URL: 'postgres://user:pass@localhost:5432/galla_mandi',
   CORS_ORIGINS: 'http://localhost:3000, http://localhost:3001',
+  JWT_ACCESS_SECRET: 'a'.repeat(32),
+  OTP_SECRET: 'b'.repeat(32),
 };
 
 describe('validateEnv', () => {
@@ -14,6 +16,15 @@ describe('validateEnv', () => {
     expect(env.THROTTLE_TTL_MS).toBe(60_000);
     expect(env.THROTTLE_LIMIT).toBe(100);
     expect(env.LOG_LEVEL).toBe('info');
+    expect(env.JWT_ACCESS_TTL_SEC).toBe(900);
+    expect(env.REFRESH_TOKEN_TTL_DAYS).toBe(7);
+    expect(env.LOGIN_THROTTLE_LIMIT).toBe(5);
+  });
+
+  it('rejects a short JWT secret', () => {
+    expect(() =>
+      validateEnv({ ...validEnv, JWT_ACCESS_SECRET: 'short' }),
+    ).toThrow(/JWT_ACCESS_SECRET/);
   });
 
   it('splits CORS_ORIGINS into a trimmed list', () => {
@@ -31,7 +42,7 @@ describe('validateEnv', () => {
   });
 
   it('fails with a clear message when DATABASE_URL is missing', () => {
-    expect(() => validateEnv({ CORS_ORIGINS: validEnv.CORS_ORIGINS })).toThrow(
+    expect(() => validateEnv({ ...validEnv, DATABASE_URL: undefined })).toThrow(
       /Invalid environment variables:\n {2}- DATABASE_URL:/,
     );
   });

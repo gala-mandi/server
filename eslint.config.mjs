@@ -30,6 +30,15 @@ export default tseslint.config(
     },
   },
   {
+    // supertest's response body is `any`; tests assert on it directly.
+    files: ['test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+    },
+  },
+  {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'error',
