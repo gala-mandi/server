@@ -1,0 +1,8 @@
+dist
+coverage
+node_modules
+package-lock.json
+src/database/migrations
+docs
+CLAUDE.md
+.github/workflows/claude.yml
