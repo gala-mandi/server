@@ -26,7 +26,9 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import type { AuthUser } from '../../common/auth/auth-user';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { ALL_ROLES } from '../../common/auth/permissions';
+import { Public } from '../../common/decorators/public.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { readCookie } from '../../common/http/cookies';
 import type { Env } from '../../config/env.schema';
 import { AuthThrottleGuard } from './auth-throttle.guard';
@@ -69,6 +71,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthThrottleGuard)
   @ApiOkResponse({ type: SessionDto, description: 'Sets the refresh cookie' })
@@ -85,6 +88,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiCookieAuth(REFRESH_COOKIE)
   @ApiOkResponse({
@@ -110,6 +114,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @Public()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiCookieAuth(REFRESH_COOKIE)
   @ApiNoContentResponse({ description: 'Ends this session, clears the cookie' })
@@ -126,7 +131,7 @@ export class AuthController {
 
   @Post('logout-all')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(JwtAuthGuard)
+  @Roles(...ALL_ROLES)
   @ApiBearerAuth()
   @ApiNoContentResponse({ description: 'Ends every session of the user' })
   @ApiUnauthorizedResponse()
@@ -140,7 +145,7 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
+  @Roles(...ALL_ROLES)
   @ApiBearerAuth()
   @ApiOkResponse({ type: UserResponseDto })
   @ApiUnauthorizedResponse()
@@ -150,7 +155,7 @@ export class AuthController {
 
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
+  @Roles(...ALL_ROLES)
   @ApiBearerAuth()
   @ApiOkResponse({
     type: RevokedSessionsDto,
@@ -165,6 +170,7 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @Public()
   @HttpCode(HttpStatus.ACCEPTED)
   @UseGuards(AuthThrottleGuard)
   @ApiAcceptedResponse({
@@ -179,6 +185,7 @@ export class AuthController {
   }
 
   @Post('reset-password')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOkResponse({

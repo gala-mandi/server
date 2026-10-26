@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { PERMISSIONS } from '../../../common/auth/permissions';
 import { tenantStatus, userRole } from '../../../database/schema';
 
 export const userSchema = z.object({
@@ -10,6 +11,8 @@ export const userSchema = z.object({
   role: z.enum(userRole.enumValues),
   tenantId: z.uuid().nullable(),
   mustChangePassword: z.boolean(),
+  /** What this user's role may do; frontends use it to hide UI. */
+  permissions: z.array(z.enum(PERMISSIONS)),
   tenant: z
     .object({
       id: z.uuid(),
