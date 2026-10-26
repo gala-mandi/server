@@ -22,6 +22,10 @@ async function main(): Promise<void> {
     // no .env file
   }
 
+  const superAdminEmail =
+    process.env.SEED_SUPER_ADMIN_EMAIL ?? 'admin@gallamandi.local';
+  const ownerEmail = process.env.SEED_OWNER_EMAIL ?? 'owner@demo-mandi.local';
+
   const pool = new Pool({ connectionString: required('DATABASE_URL') });
   const db = drizzle(pool, { schema });
 
@@ -31,10 +35,15 @@ async function main(): Promise<void> {
       .values({
         name: 'Platform Admin',
         phone: process.env.SEED_SUPER_ADMIN_PHONE ?? '03000000001',
+        email: superAdminEmail,
         passwordHash: await argon2.hash(required('SEED_SUPER_ADMIN_PASSWORD')),
         role: 'super_admin',
       })
-      .onConflictDoNothing({ target: users.phone });
+      // Re-running fills in the email of a user seeded before it existed.
+      .onConflictDoUpdate({
+        target: users.phone,
+        set: { email: superAdminEmail },
+      });
 
     const [tenant] = await db
       .insert(tenants)
@@ -55,10 +64,11 @@ async function main(): Promise<void> {
         tenantId: tenant.id,
         name: 'Demo Owner',
         phone: process.env.SEED_OWNER_PHONE ?? '03000000002',
+        email: ownerEmail,
         passwordHash: await argon2.hash(required('SEED_OWNER_PASSWORD')),
         role: 'owner',
       })
-      .onConflictDoNothing({ target: users.phone });
+      .onConflictDoUpdate({ target: users.phone, set: { email: ownerEmail } });
 
     console.log('Seed done: super-admin and Demo Mandi owner are ready.');
   } finally {
