@@ -15,6 +15,20 @@
       "when": 1792953458979,
       "tag": "0001_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793041585793,
+      "tag": "0002_audit_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793041593301,
+      "tag": "0003_tenant_rls",
+      "breakpoints": true
     }
   ]
 }

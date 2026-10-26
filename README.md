@@ -69,7 +69,7 @@ test/                     integration and e2e tests
 ## What is set up
 
 - **Config:** `@nestjs/config` + Zod (`src/config/env.schema.ts`)
-- **Database:** global `DatabaseModule` gives a Drizzle instance (`@Inject(DRIZZLE)`). First migration creates `tenants` and `users`.
+- **Database:** global `DatabaseModule` gives `TenantDatabase` for shop data (see [Multi-tenant data](#multi-tenant-data-how-to-add-a-business-table)) and the raw Drizzle instance (`@Inject(DRIZZLE)`) for `auth` and `health` only. First migration creates `tenants` and `users`.
 - **Validation:** global `ZodValidationPipe` (nestjs-zod). DTOs are Zod schemas.
 - **Errors:** every error is JSON `{ statusCode, message, errors? }`. Validation errors list `errors: [{ field, message }]`. Stack traces are logged, never returned.
 - **Security:** helmet, CORS allow-list (`CORS_ORIGINS`), rate limit with `@nestjs/throttler` (`THROTTLE_LIMIT` per `THROTTLE_TTL_MS`, `429` when over).
@@ -104,3 +104,87 @@ test/                     integration and e2e tests
 3. Run `npm run db:migrate`.
 
 Never edit a migration that is already merged.
+
+## Multi-tenant data (how to add a business table)
+
+Every shop is a tenant. A shop must never see another shop's rows. Two layers make sure of that:
+
+1. **The query helper** adds `WHERE tenant_id = <shop>` to every query and sets `tenant_id` on every insert.
+2. **Row-Level Security (RLS)** in Postgres blocks other shops' rows, even if a query forgets the helper.
+
+### 1. The table
+
+- Start with `tenantColumns()` (`src/database/tenant-table.ts`). It adds `id`, `tenant_id` (NOT NULL, FK to `tenants`), `created_by`, `created_at`, `updated_at` and `deleted_at`.
+- Every index starts with `tenant_id`, for example `(tenant_id, created_at)`. List queries then use the index.
+- Unique constraints are per shop: `UNIQUE (tenant_id, phone)`, never `UNIQUE (phone)`. Two shops may have the same trader phone.
+- Add `tenantIsolation()` to the table extras. `npm run db:generate` then writes `ENABLE ROW LEVEL SECURITY` and the `tenant_isolation` policy into the migration.
+
+```ts
+// src/database/schema/traders.ts
+export const traders = pgTable(
+  'traders',
+  {
+    ...tenantColumns(),
+    name: varchar('name', { length: 120 }).notNull(),
+    phone: varchar('phone', { length: 20 }),
+  },
+  (t) => [
+    index('traders_tenant_id_created_at_idx').on(t.tenantId, t.createdAt),
+    uniqueIndex('traders_tenant_id_phone_key').on(t.tenantId, t.phone),
+    tenantIsolation(),
+  ],
+);
+```
+
+### 2. The service
+
+- Inject `TenantDatabase` (never `DRIZZLE`).
+- Run each request's work in `transaction(({ scoped, tx }) => …)`. One call is one DB transaction.
+- `scoped(table)` gives `findMany`, `findById`, `count`, `insert`, `update` and `softDelete`. They always filter on the shop and skip soft-deleted rows.
+- For paging, sorting or joins, write the query on `tx` and use `scoped(table).where(...)` or `.byId(id)` as the `WHERE`. They carry the tenant filter.
+- Another shop's id is "not found": return `404`, never `403`, so ids can't be probed.
+
+```ts
+@Injectable()
+export class TradersService {
+  constructor(private readonly db: TenantDatabase) {}
+
+  update(id: string, dto: UpdateTraderDto) {
+    return this.db.transaction(async ({ scoped }) => {
+      const [row] = await scoped(traders).update(id, dto);
+      if (!row) throw new NotFoundException('Trader not found');
+      return row;
+    });
+  }
+}
+```
+
+### Where the shop comes from
+
+- The shop id comes **only from the access token**. The JWT strategy puts `tenantId`, `userId` and `role` in the request context (nestjs-cls). `TenantDatabase` reads it from there.
+- Never take `tenant_id` from the body, params or query. `StripTenantIdMiddleware` removes `tenant_id` and `tenantId` from every JSON body, also inside nested objects and arrays. `scoped().insert()` and `update()` drop them again and set the shop from the token.
+- A token without a shop gets `403` on shop endpoints (`TenantGuard`).
+
+### Super-admin access to a shop
+
+- `super_admin` has no shop. It can open one only with `tenantDb.withTenant(tenantId, fn)`.
+- Each call first writes a row to `audit_logs` with `action = 'access'`, then runs `fn` inside that shop. Any other role gets `403`.
+
+### Why RLS works even when the API connects as a superuser
+
+Superusers and table owners skip RLS. So every `transaction()` runs `SET LOCAL ROLE app_tenant` and `set_config('app.tenant_id', …, true)`. The `app_tenant` role (migration `0003_tenant_rls`) has no `BYPASSRLS`, so the policy always applies. Both settings are `LOCAL`: they end with the transaction, so a pooled connection never carries one shop into the next request. Without `app.tenant_id` the role sees no rows at all.
+
+### Lint rule
+
+ESLint blocks importing `DRIZZLE` from `…/database/database.module` or `…/database/database.tokens` in `src/modules/**`. Importing the `Database` type is fine. `src/modules/auth/**` and `src/modules/health/**` are exempt: login finds the user before the shop is known, and the health check pings the DB. Don't add more exemptions without a review.
+
+### Review checklist for a new module
+
+- [ ] Every business table uses `tenantColumns()` and `tenantIsolation()`.
+- [ ] Every index starts with `tenant_id`; unique constraints include `tenant_id`.
+- [ ] The migration has `ENABLE ROW LEVEL SECURITY` and the `tenant_isolation` policy.
+- [ ] Services inject `TenantDatabase`, not `DRIZZLE`; queries use `scoped()` or its `where()` / `byId()`.
+- [ ] No `tenant_id` in DTOs, params or query strings.
+- [ ] Another shop's id returns `404` on read, update and delete.
+- [ ] e2e isolation test with two seeded shops (read, update, delete across shops fail).
+- [ ] Super-admin access goes through `withTenant()` only.
