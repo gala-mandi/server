@@ -4,6 +4,7 @@ import {
   accountDisabled,
   tenantSuspended,
 } from '../../common/auth/auth-errors';
+import { permissionsFor } from '../../common/auth/permissions';
 import { DRIZZLE, type Database } from '../../database/database.module';
 import { tenants, users } from '../../database/schema';
 import type { Identifier } from './identifier';
@@ -74,6 +75,7 @@ export class AuthUsersService {
       role: user.role,
       tenantId: user.tenantId,
       mustChangePassword: user.mustChangePassword,
+      permissions: [...permissionsFor(user.role)],
       tenant: tenant
         ? {
             id: tenant.id,

@@ -10,6 +10,7 @@ import {
   sessionExpired,
 } from '../../common/auth/auth-errors';
 import type { AuthUser } from '../../common/auth/auth-user';
+import { permissionsFor } from '../../common/auth/permissions';
 import { DRIZZLE, type Database } from '../../database/database.module';
 import { users } from '../../database/schema';
 import { AuthLogService } from './auth-log.service';
@@ -179,7 +180,13 @@ export class AuthService {
   async me(user: AuthUser): Promise<UserDto> {
     const found = await this.usersService.findById(user.id);
     if (!found) throw new NotFoundException('User not found');
-    return this.usersService.toDto(found);
+    // Role and permissions as the guards see them: from the access token, so a
+    // role change shows here at the same time it takes effect (next refresh).
+    return {
+      ...this.usersService.toDto(found),
+      role: user.role,
+      permissions: [...permissionsFor(user.role)],
+    };
   }
 
   /** Keeps the current session; ends all others. */

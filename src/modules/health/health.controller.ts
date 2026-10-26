@@ -10,6 +10,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { sql } from 'drizzle-orm';
+import { Public } from '../../common/decorators/public.decorator';
 import { DRIZZLE, type Database } from '../../database/database.module';
 import { HealthDto } from './health.dto';
 
@@ -19,6 +20,7 @@ export class HealthController {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
   @Get()
+  @Public()
   @ApiOkResponse({ type: HealthDto })
   @ApiServiceUnavailableResponse({ description: 'Database is not reachable' })
   async check(): Promise<HealthDto> {

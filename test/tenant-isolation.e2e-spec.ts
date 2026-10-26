@@ -237,20 +237,22 @@ describe('Tenant isolation (e2e)', () => {
       ).toBe(true);
     });
 
+    // The global RolesGuard runs before the controller's TenantGuard, so a
+    // shop route that lists shop roles rejects super_admin by role first.
     it.each([
-      ['GET', '/test-items'],
-      ['GET', '/test-items-raw'],
-      ['POST', '/test-items'],
+      ['GET', '/test-items', 'You do not have access to this action'],
+      ['GET', '/test-items-raw', 'No shop selected'],
+      ['POST', '/test-items', 'You do not have access to this action'],
     ])(
       'token without tenantId (super_admin) on %s %s → 403',
-      async (method, url) => {
+      async (method, url, message) => {
         const req =
           method === 'GET'
             ? get(admin, url)
             : post(admin, url, { name: 'Admin item' });
 
         const res = await req.expect(403);
-        expect(res.body.message).toBe('No shop selected');
+        expect(res.body.message).toBe(message);
       },
     );
 
