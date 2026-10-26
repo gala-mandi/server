@@ -32,6 +32,9 @@ jobs:
     env:
       DATABASE_URL: postgres://galla:galla@localhost:5432/galla_mandi
       CORS_ORIGINS: http://localhost:3000,http://localhost:3001
+      # Test-only values; real secrets live in the deployment environment.
+      JWT_ACCESS_SECRET: ci-only-access-secret-not-used-anywhere-else
+      OTP_SECRET: ci-only-otp-secret-not-used-anywhere-else-ok
       LOG_LEVEL: silent
 
     steps:

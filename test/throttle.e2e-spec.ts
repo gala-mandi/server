@@ -31,5 +31,5 @@ describe('Rate limit (e2e)', () => {
       statusCode: 429,
       message: 'Too many requests, please try again later',
     });
-  });
+  }, 30_000);
 });

@@ -19,6 +19,8 @@ export interface ErrorBody {
   statusCode: number;
   message: string;
   errors?: FieldError[];
+  /** Machine-readable reason, e.g. `ACCOUNT_DISABLED`. */
+  code?: string;
 }
 
 /**
@@ -59,6 +61,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return {
         statusCode: exception.getStatus(),
         message: messageOf(exception),
+        ...extrasOf(exception),
       };
     }
 
@@ -74,6 +77,20 @@ function toFieldErrors(error: ZodError): FieldError[] {
     field: issue.path.join('.'),
     message: issue.message,
   }));
+}
+
+/** Keeps `code` and `errors` when a service throws them on purpose. */
+function extrasOf(
+  exception: HttpException,
+): Pick<ErrorBody, 'code' | 'errors'> {
+  const response = exception.getResponse();
+  if (typeof response !== 'object' || response === null) return {};
+
+  const { code, errors } = response as { code?: unknown; errors?: unknown };
+  return {
+    ...(typeof code === 'string' && { code }),
+    ...(Array.isArray(errors) && { errors: errors as FieldError[] }),
+  };
 }
 
 function messageOf(exception: HttpException): string {

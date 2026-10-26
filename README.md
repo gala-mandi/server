@@ -17,6 +17,7 @@ cp .env.example .env          # then change POSTGRES_PASSWORD and DATABASE_URL
 npm install
 docker compose up -d          # starts Postgres
 npm run db:migrate            # creates the tables
+npm run db:seed               # super-admin + demo shop owner (passwords from .env)
 npm run dev                   # API on http://localhost:4000
 ```
 
@@ -49,6 +50,7 @@ Never commit `.env`.
 | `npm run test:e2e`                        | Integration + e2e tests (Jest + supertest) against the Postgres in `DATABASE_URL` |
 | `npm run db:generate`                     | Generate a migration from the Drizzle schema                                      |
 | `npm run db:migrate`                      | Apply migrations                                                                  |
+| `npm run db:seed`                         | Create the dev super-admin and the Demo Mandi owner (safe to re-run)              |
 
 A Husky pre-commit hook runs ESLint and Prettier on staged files (lint-staged). CI (`.github/workflows/ci.yml`) runs lint, format check, type-check, unit tests, migrations, e2e tests and the build on every pull request.
 
@@ -73,6 +75,27 @@ test/                     integration and e2e tests
 - **Security:** helmet, CORS allow-list (`CORS_ORIGINS`), rate limit with `@nestjs/throttler` (`THROTTLE_LIMIT` per `THROTTLE_TTL_MS`, `429` when over).
 - **Logs:** nestjs-pino (JSON). `Authorization` and `Cookie` headers are redacted.
 - **Docs:** Swagger UI at `/docs`, OpenAPI JSON at `/docs-json`.
+
+## Authentication
+
+| Endpoint                                                  | Auth   | What it does                                                                            |
+| --------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------- |
+| `POST /auth/login`                                        | —      | Phone or email + password. Returns an access token and sets the `refresh_token` cookie. |
+| `POST /auth/refresh`                                      | cookie | Rotates the refresh token and returns a new access token.                               |
+| `POST /auth/logout`                                       | cookie | Ends this session and clears the cookie.                                                |
+| `POST /auth/logout-all`                                   | Bearer | Ends every session of the user.                                                         |
+| `GET /auth/me`                                            | Bearer | The current user and shop.                                                              |
+| `POST /auth/change-password`                              | Bearer | Ends the user's other sessions.                                                         |
+| `POST /auth/forgot-password`, `POST /auth/reset-password` | —      | 6-digit code, then a new password. Ends every session.                                  |
+
+- **Access token:** JWT (HS256), 15 minutes, payload `{ sub, tenantId, role, sid }`. Clients keep it in memory.
+- **Refresh token:** random, stored as a SHA-256 hash in `refresh_tokens`, sent as an `httpOnly`, `SameSite=Lax` cookie (`Secure` outside development). 7 days with "keep me signed in", otherwise a browser-session cookie. Each refresh revokes the old token; using a rotated token again ends every session of that user.
+- **Errors:** `401 Invalid credentials` (same for unknown users), `403` with `code: ACCOUNT_DISABLED` or `TENANT_SUSPENDED`, `401` with `code: SESSION_EXPIRED`, `400` with `code: INVALID_OTP`.
+- **Brute force:** `LOGIN_THROTTLE_LIMIT` (5) tries per minute for each IP + phone/email on login and forgot-password, then `429` with `Retry-After`.
+- **Logs:** every login, logout, failed try, refresh, lock-out and reset goes to `auth_logs`. Passwords, tokens and codes are never logged.
+- **OTP:** sent through the `OtpSender` interface (`src/modules/auth/otp/otp-sender.ts`). There is no WhatsApp/SMS provider yet: in development the code is written to the server log, elsewhere nothing is sent. Add a provider by binding another `OtpSender` to `OTP_SENDER`.
+- **In code:** protect a route with `@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)`, read the user with `@CurrentUser()`, the shop with `@CurrentTenant()` (always from the token), and limit roles with `@Roles('owner')`.
+- **Behind a proxy:** set Express `trust proxy` so `req.ip` (used for rate limits and logs) is the client's address.
 
 ## Database changes
 
