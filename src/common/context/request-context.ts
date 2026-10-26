@@ -7,6 +7,7 @@ import type { Role } from '../auth/auth-user';
  */
 export interface RequestContext extends ClsStore {
   ip?: string;
+  userAgent?: string;
   userId?: string;
   tenantId?: string | null;
   role?: Role;

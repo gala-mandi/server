@@ -5,6 +5,7 @@ import {
   and,
   eq,
   type InferSelectModel,
+  isNotNull,
   isNull,
   type SQL,
   sql,
@@ -52,10 +53,14 @@ export function tenantScoped<T extends TenantTable>(
 ) {
   const where = (extra?: SQL): SQL =>
     and(eq(table.tenantId, tenantId), isNull(table.deletedAt), extra)!;
+  /** Same shop, soft-deleted rows included (reports, restore). */
+  const whereWithDeleted = (extra?: SQL): SQL =>
+    and(eq(table.tenantId, tenantId), extra)!;
 
   return {
     tenantId,
     where,
+    whereWithDeleted,
 
     /** `WHERE` for one row of this shop, for queries written by hand. */
     byId: (id: string): SQL => where(eq(table.id, id)),
@@ -107,6 +112,20 @@ export function tenantScoped<T extends TenantTable>(
         .set({ deletedAt: sql`now()` } as PgUpdateSetSource<T>)
         .where(where(eq(table.id, id)))
         .returning({ id: table.id }),
+
+    /** Brings back a soft-deleted row of this shop. */
+    restore: (id: string) =>
+      tx
+        .update(table)
+        .set({ deletedAt: null } as PgUpdateSetSource<T>)
+        .where(
+          and(
+            eq(table.tenantId, tenantId),
+            eq(table.id, id),
+            isNotNull(table.deletedAt),
+          ),
+        )
+        .returning(),
   };
 }
 
