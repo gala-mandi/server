@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from '../../src/database/schema';
 import {
+  auditLogs,
   authLogs,
   otpCodes,
   refreshTokens,
@@ -84,6 +85,11 @@ export class Fixtures {
         .delete(authLogs)
         .where(
           or(inArray(authLogs.userId, ids), inArray(authLogs.tenantId, tIds)),
+        );
+      await this.db
+        .delete(auditLogs)
+        .where(
+          or(inArray(auditLogs.userId, ids), inArray(auditLogs.tenantId, tIds)),
         );
       await this.db.delete(otpCodes).where(inArray(otpCodes.userId, ids));
       await this.db

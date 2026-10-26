@@ -1,8 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
+import { ClsService } from 'nestjs-cls';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { AccessTokenPayload, AuthUser } from '../../common/auth/auth-user';
+import type { RequestContext } from '../../common/context/request-context';
 import type { Env } from '../../config/env.schema';
 import { AuthUsersService } from './auth-users.service';
 
@@ -11,6 +13,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     config: ConfigService<Env, true>,
     private readonly usersService: AuthUsersService,
+    private readonly cls: ClsService<RequestContext>,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -29,6 +32,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
     // Disabled users and suspended shops lose access right away.
     this.usersService.assertCanSignIn(found);
+
+    // Request context for TenantDatabase: only ever from the verified token.
+    this.cls.set('userId', payload.sub);
+    this.cls.set('tenantId', payload.tenantId);
+    this.cls.set('role', payload.role);
 
     return {
       id: payload.sub,

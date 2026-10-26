@@ -1,3 +1,4 @@
+export * from './audit-logs';
 export * from './auth-logs';
 export * from './otp-codes';
 export * from './refresh-tokens';
