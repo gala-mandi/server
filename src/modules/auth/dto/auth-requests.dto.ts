@@ -41,3 +41,12 @@ export class LoginDto extends createZodDto(loginSchema) {}
 export class ChangePasswordDto extends createZodDto(changePasswordSchema) {}
 export class ForgotPasswordDto extends createZodDto(forgotPasswordSchema) {}
 export class ResetPasswordDto extends createZodDto(resetPasswordSchema) {}
+
+export const acceptInviteSchema = z.object({
+  // Length is checked in the service so every bad token gets INVITE_INVALID.
+  token: z.string().trim().max(5000),
+  name: z.string().trim().min(2, 'Enter your name').max(120),
+  password: newPassword,
+});
+
+export class AcceptInviteDto extends createZodDto(acceptInviteSchema) {}

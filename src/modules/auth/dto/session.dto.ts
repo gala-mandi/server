@@ -48,3 +48,7 @@ export class RevokedSessionsDto extends createZodDto(revokedSessionsSchema) {}
 export class ForgotPasswordResultDto extends createZodDto(
   forgotPasswordResultSchema,
 ) {}
+
+export class AcceptedInviteDto extends createZodDto(
+  z.object({ phone: z.string(), shopName: z.string() }),
+) {}

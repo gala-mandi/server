@@ -255,6 +255,8 @@ describe('Row-Level Security (integration)', () => {
       expect(rows.map((r) => r.table)).toContain(ISOLATION_TABLE);
       // First real business table (migration 0005).
       expect(rows.map((r) => r.table)).toContain('tenant_settings');
+      // Staff invites (migration 0006).
+      expect(rows.map((r) => r.table)).toContain('invitations');
 
       const unprotected = rows.filter(
         (r) =>

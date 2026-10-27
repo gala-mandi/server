@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import type { Env } from '../../config/env.schema';
+import { AcceptInviteService } from './accept-invite.service';
 import { AuthLogService } from './auth-log.service';
 import { AuthThrottleGuard } from './auth-throttle.guard';
 import { AuthUsersService } from './auth-users.service';
@@ -32,6 +33,7 @@ import { TokensService } from './tokens.service';
   controllers: [AuthController],
   providers: [
     AuthService,
+    AcceptInviteService,
     AuthUsersService,
     AuthLogService,
     PasswordService,
