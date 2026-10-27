@@ -140,7 +140,8 @@ export const traders = pgTable(
 
 - Inject `TenantDatabase` (never `DRIZZLE`).
 - Run each request's work in `transaction(({ scoped, tx }) => …)`. One call is one DB transaction.
-- `scoped(table)` gives `findMany`, `findById`, `count`, `insert`, `update` and `softDelete`. They always filter on the shop and skip soft-deleted rows.
+- `scoped(table)` gives `findMany`, `findById`, `count`, `insert`, `update`, `softDelete` and `restore`. Reads always filter on the shop and skip soft-deleted rows; `whereWithDeleted()` includes them (for reports that must still show a deleted trader's name).
+- Every write through `scoped()` also writes `audit_logs` in the same transaction (see "Audit log"). `update` returns the row or `null`, `softDelete` returns `true`/`false`.
 - For paging, sorting or joins, write the query on `tx` and use `scoped(table).where(...)` or `.byId(id)` as the `WHERE`. They carry the tenant filter.
 - Another shop's id is "not found": return `404`, never `403`, so ids can't be probed.
 
@@ -151,7 +152,7 @@ export class TradersService {
 
   update(id: string, dto: UpdateTraderDto) {
     return this.db.transaction(async ({ scoped }) => {
-      const [row] = await scoped(traders).update(id, dto);
+      const row = await scoped(traders).update(id, dto);
       if (!row) throw new NotFoundException('Trader not found');
       return row;
     });
@@ -188,3 +189,16 @@ ESLint blocks importing `DRIZZLE` from `…/database/database.module` or `…/da
 - [ ] Another shop's id returns `404` on read, update and delete.
 - [ ] e2e isolation test with two seeded shops (read, update, delete across shops fail).
 - [ ] Super-admin access goes through `withTenant()` only.
+- [ ] Writes go through `scoped()` so they are audited; no `tx.delete(...)` on business tables (soft delete only).
+- [ ] Restorable tables are registered in `RestorableRegistry`.
+
+## Audit log and soft delete
+
+- **Automatic:** `scoped(table).insert/update/softDelete/restore` write one `audit_logs` row each, in the same transaction as the change (if the log fails, the change is rolled back). The row has the shop, user, table name (`entity`), row id, `action` (`create`, `update`, `delete`, `restore`; `access` for super-admin `withTenant`), IP and user agent.
+- **What is stored:** `create`/`restore` keep the new row in `after`; `delete` keeps the old row in `before`; `update` keeps only the changed fields, e.g. `before: { weight: 400 }`, `after: { weight: 420 }`. Keys that look like passwords, tokens, secrets, OTPs or hashes are stored as `[REDACTED]` (`src/database/audit/audit-diff.ts`).
+- **Never hard-delete business data.** Use `softDelete`; reads skip deleted rows by default.
+- **Restore (owner):** `POST /records/:entity/:id/restore`. A module makes its table restorable with `registry.register('traders', traders)` (inject `RestorableRegistry`, e.g. in `onModuleInit`).
+- **Reading the log:**
+  - `GET /audit-logs` (owner, own shop) with filters `userId`, `entity`, `entityId`, `action`, `from`, `to` (a date-only `to` includes that day), `page`, `limit` (max 100). It returns `{ data, meta }`, newest first.
+  - Super-admin: `GET /admin/tenants/:tenantId/audit-logs`. That access is logged too.
+- Sign-ins, sign-outs and failures are in `auth_logs` (see "Authentication"). Passwords, tokens and codes are never written to either log.

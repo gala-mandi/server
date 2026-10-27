@@ -4,6 +4,7 @@ import {
   inet,
   jsonb,
   pgTable,
+  text,
   timestamp,
   uuid,
   varchar,
@@ -24,6 +25,7 @@ export const auditLogs = pgTable(
     before: jsonb('before'),
     after: jsonb('after'),
     ip: inet('ip'),
+    userAgent: text('user_agent'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

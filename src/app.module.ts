@@ -13,6 +13,7 @@ import { RolesGuard } from './common/guards/roles.guard';
 import { StripTenantIdMiddleware } from './common/middleware/strip-tenant-id.middleware';
 import { type Env, validateEnv } from './config/env.schema';
 import { DatabaseModule } from './database/database.module';
+import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
@@ -24,7 +25,10 @@ import { UsersModule } from './modules/users/users.module';
       global: true,
       middleware: {
         mount: true,
-        setup: (cls, req: Request) => cls.set('ip', req.ip),
+        setup: (cls, req: Request) => {
+          cls.set('ip', req.ip);
+          cls.set('userAgent', req.headers['user-agent']);
+        },
       },
     }),
     LoggerModule.forRootAsync({
@@ -56,6 +60,7 @@ import { UsersModule } from './modules/users/users.module';
     HealthModule,
     AuthModule,
     UsersModule,
+    AuditModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

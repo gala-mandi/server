@@ -89,7 +89,7 @@ class IsolationItemsController {
 
   @Patch(':id')
   async update(@Param('id', uuid) id: string, @Body() body: ItemBody) {
-    const [row] = await uniqueName(() =>
+    const row = await uniqueName(() =>
       this.db.transaction(({ scoped }) =>
         scoped(isolationItems).update(id, { ...body }),
       ),
@@ -101,10 +101,10 @@ class IsolationItemsController {
   @Delete(':id')
   @HttpCode(204)
   async remove(@Param('id', uuid) id: string): Promise<void> {
-    const [row] = await this.db.transaction(({ scoped }) =>
+    const deleted = await this.db.transaction(({ scoped }) =>
       scoped(isolationItems).softDelete(id),
     );
-    if (!row) throw new NotFoundException('Item not found');
+    if (!deleted) throw new NotFoundException('Item not found');
   }
 }
 

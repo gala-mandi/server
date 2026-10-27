@@ -161,6 +161,7 @@ describe('TenantDatabase', () => {
         entityId: SHOP,
         action: 'access',
         ip: '10.0.0.1',
+        userAgent: null,
       });
       expect(fake.executed[1].params).toEqual([SHOP]);
       expect(fn).toHaveBeenCalledWith(

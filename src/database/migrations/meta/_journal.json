@@ -29,6 +29,13 @@
       "when": 1793041593301,
       "tag": "0003_tenant_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793046575051,
+      "tag": "0004_audit_user_agent",
+      "breakpoints": true
     }
   ]
 }
