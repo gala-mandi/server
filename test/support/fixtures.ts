@@ -9,6 +9,7 @@ import {
   authLogs,
   otpCodes,
   refreshTokens,
+  tenantSettings,
   tenants,
   users,
 } from '../../src/database/schema';
@@ -73,7 +74,25 @@ export class Fixtures {
     return row;
   }
 
+  /**
+   * A shop created through the API: removed in `cleanup()` together with its
+   * users, settings, tokens and logs.
+   */
+  trackTenant(id: string): void {
+    if (!this.tenantIds.includes(id)) this.tenantIds.push(id);
+  }
+
   async cleanup(): Promise<void> {
+    if (this.tenantIds.length) {
+      // Users the API created inside tracked shops (e.g. a new shop's owner).
+      const shopUsers = await this.db
+        .select({ id: users.id })
+        .from(users)
+        .where(inArray(users.tenantId, this.tenantIds));
+      for (const { id } of shopUsers) {
+        if (!this.userIds.includes(id)) this.userIds.push(id);
+      }
+    }
     if (this.userIds.length || this.tenantIds.length) {
       const ids = this.userIds.length
         ? this.userIds
@@ -96,6 +115,9 @@ export class Fixtures {
         .delete(refreshTokens)
         .where(inArray(refreshTokens.userId, ids));
       await this.db.delete(users).where(inArray(users.id, ids));
+      await this.db
+        .delete(tenantSettings)
+        .where(inArray(tenantSettings.tenantId, tIds));
       await this.db.delete(tenants).where(inArray(tenants.id, tIds));
     }
     await this.pool.end();

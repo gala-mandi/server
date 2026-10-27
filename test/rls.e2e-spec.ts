@@ -253,6 +253,8 @@ describe('Row-Level Security (integration)', () => {
 
       // Proves the check really runs: the test table is in the list.
       expect(rows.map((r) => r.table)).toContain(ISOLATION_TABLE);
+      // First real business table (migration 0005).
+      expect(rows.map((r) => r.table)).toContain('tenant_settings');
 
       const unprotected = rows.filter(
         (r) =>
