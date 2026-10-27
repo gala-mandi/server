@@ -10,6 +10,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import type { Env } from '../config/env.schema';
 import * as schema from './schema';
+import { PlatformDatabase } from './platform-database';
 import { TenantDatabase } from './tenant-database';
 
 import { type Database, DRIZZLE, PG_POOL } from './database.tokens';
@@ -41,7 +42,8 @@ class PoolShutdown implements OnApplicationShutdown {
     },
     PoolShutdown,
     TenantDatabase,
+    PlatformDatabase,
   ],
-  exports: [DRIZZLE, TenantDatabase],
+  exports: [DRIZZLE, TenantDatabase, PlatformDatabase],
 })
 export class DatabaseModule {}

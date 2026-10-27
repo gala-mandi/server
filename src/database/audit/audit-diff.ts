@@ -11,7 +11,11 @@ const SENSITIVE_WORDS = new Set([
   'otp',
 ]);
 
+// Flags whose names mention a password but hold no secret.
+const NOT_SECRET = new Set(['mustChangePassword', 'must_change_password']);
+
 export function isSensitiveKey(key: string): boolean {
+  if (NOT_SECRET.has(key)) return false;
   const words = key
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .toLowerCase()

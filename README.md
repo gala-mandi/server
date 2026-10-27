@@ -202,3 +202,15 @@ ESLint blocks importing `DRIZZLE` from `…/database/database.module` or `…/da
   - `GET /audit-logs` (owner, own shop) with filters `userId`, `entity`, `entityId`, `action`, `from`, `to` (a date-only `to` includes that day), `page`, `limit` (max 100). It returns `{ data, meta }`, newest first.
   - Super-admin: `GET /admin/tenants/:tenantId/audit-logs`. That access is logged too.
 - Sign-ins, sign-outs and failures are in `auth_logs` (see "Authentication"). Passwords, tokens and codes are never written to either log.
+
+## Shops (super-admin)
+
+| Endpoint                                             | What it does                                                                                                                                                                                                                                               |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /admin/tenants`                                 | List with `search` (shop, owner, phone, city), `status`, `sort`, `page`, `limit`.                                                                                                                                                                          |
+| `POST /admin/tenants`                                | Creates the shop, its owner and default `tenant_settings` in one transaction. Returns the owner's **temporary password once**; the owner must change it at first sign-in. `409` if the owner's phone or email already has an account (nothing is created). |
+| `GET /admin/tenants/:id`, `PATCH /admin/tenants/:id` | Detail and edit.                                                                                                                                                                                                                                           |
+| `POST /admin/tenants/:id/suspend`                    | Blocks sign-in and revokes every refresh token of the shop's users (they are out within one access-token lifetime).                                                                                                                                        |
+| `POST /admin/tenants/:id/activate`                   | Allows sign-in again.                                                                                                                                                                                                                                      |
+
+All need `tenant.manage` (super-admin). They run through `PlatformDatabase` (`src/database/platform-database.ts`): a super-admin-only transaction for work across shops, where every write calls `audit()` to write `audit_logs` in the same transaction. New shops start as `trial`.
