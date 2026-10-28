@@ -13,6 +13,8 @@ import { ConfigService } from '@nestjs/config';
 import {
   ApiAcceptedResponse,
   ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiCreatedResponse,
   ApiBearerAuth,
   ApiCookieAuth,
   ApiForbiddenResponse,
@@ -32,14 +34,17 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { readCookie } from '../../common/http/cookies';
 import type { Env } from '../../config/env.schema';
 import { AuthThrottleGuard } from './auth-throttle.guard';
+import { AcceptInviteService } from './accept-invite.service';
 import { AuthService, type SessionResult } from './auth.service';
 import {
+  AcceptInviteDto,
   ChangePasswordDto,
   ForgotPasswordDto,
   LoginDto,
   ResetPasswordDto,
 } from './dto/auth-requests.dto';
 import {
+  AcceptedInviteDto,
   ForgotPasswordResultDto,
   RevokedSessionsDto,
   SessionDto,
@@ -60,6 +65,7 @@ export class AuthController {
 
   constructor(
     private readonly auth: AuthService,
+    private readonly acceptInvites: AcceptInviteService,
     config: ConfigService<Env, true>,
   ) {
     this.cookie = {
@@ -198,6 +204,26 @@ export class AuthController {
     @Req() req: Request,
   ): Promise<RevokedSessionsDto> {
     return this.auth.resetPassword(dto, requestMeta(req));
+  }
+
+  @Post('accept-invite')
+  @Public()
+  @UseGuards(AuthThrottleGuard)
+  @ApiCreatedResponse({
+    type: AcceptedInviteDto,
+    description:
+      "Creates the account in the inviting shop with the invite's role",
+  })
+  @ApiBadRequestResponse({
+    description:
+      'INVITE_INVALID | INVITE_USED | INVITE_CANCELLED | INVITE_EXPIRED',
+  })
+  @ApiConflictResponse({ description: 'PHONE_TAKEN' })
+  acceptInvite(
+    @Body() dto: AcceptInviteDto,
+    @Req() req: Request,
+  ): Promise<AcceptedInviteDto> {
+    return this.acceptInvites.accept(dto, requestMeta(req));
   }
 
   private sendSession(res: Response, session: SessionResult): SessionDto {

@@ -25,6 +25,8 @@ export const envSchema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
   // Set in production when web/admin and the API share a parent domain.
   COOKIE_DOMAIN: z.string().min(1).optional(),
+  /** Shop panel address, used to build staff invite links. */
+  WEB_APP_URL: z.url().default('http://localhost:3000'),
   OTP_SECRET: z.string().min(32),
   LOGIN_THROTTLE_LIMIT: z.coerce.number().int().positive().default(5),
   LOGIN_THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60_000),

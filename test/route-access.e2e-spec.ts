@@ -94,6 +94,7 @@ describe('Route access metadata (e2e)', () => {
 
     expect(open).toEqual(
       [
+        'AuthController.acceptInvite',
         'AuthController.forgotPassword',
         'AuthController.login',
         'AuthController.logout',

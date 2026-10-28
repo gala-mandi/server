@@ -1,0 +1,22 @@
+import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { Env } from '../../config/env.schema';
+import { AuthModule } from '../auth/auth.module';
+import { INVITE_SENDER, LogInviteSender } from './invite-sender';
+import { StaffController } from './staff.controller';
+import { StaffService } from './staff.service';
+
+@Module({
+  imports: [AuthModule],
+  controllers: [StaffController],
+  providers: [
+    StaffService,
+    {
+      provide: INVITE_SENDER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) =>
+        new LogInviteSender(config.get('NODE_ENV', { infer: true })),
+    },
+  ],
+})
+export class StaffModule {}

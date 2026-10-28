@@ -7,6 +7,7 @@ import * as schema from '../../src/database/schema';
 import {
   auditLogs,
   authLogs,
+  invitations,
   otpCodes,
   refreshTokens,
   tenantSettings,
@@ -84,7 +85,8 @@ export class Fixtures {
 
   async cleanup(): Promise<void> {
     if (this.tenantIds.length) {
-      // Users the API created inside tracked shops (e.g. a new shop's owner).
+      // Users the API created inside tracked shops (e.g. a new shop's owner,
+      // or staff who accepted an invite).
       const shopUsers = await this.db
         .select({ id: users.id })
         .from(users)
@@ -109,6 +111,15 @@ export class Fixtures {
         .delete(auditLogs)
         .where(
           or(inArray(auditLogs.userId, ids), inArray(auditLogs.tenantId, tIds)),
+        );
+      // Invites of tracked shops, or sent by tracked users.
+      await this.db
+        .delete(invitations)
+        .where(
+          or(
+            inArray(invitations.tenantId, tIds),
+            inArray(invitations.invitedBy, ids),
+          ),
         );
       await this.db.delete(otpCodes).where(inArray(otpCodes.userId, ids));
       await this.db

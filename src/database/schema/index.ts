@@ -1,5 +1,6 @@
 export * from './audit-logs';
 export * from './auth-logs';
+export * from './invitations';
 export * from './otp-codes';
 export * from './refresh-tokens';
 export * from './tenant-settings';

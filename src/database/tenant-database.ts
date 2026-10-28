@@ -11,7 +11,9 @@ import type { RequestContext } from '../common/context/request-context';
 import { DRIZZLE, type Database } from './database.tokens';
 import { auditLogs, tenants } from './schema';
 import type { TenantTable } from './tenant-table';
+import { maskSensitive } from './audit/audit-diff';
 import { auditedScoped, type AuditedScoped } from './audit/audited-scoped';
+import type { AuditEntry } from './platform-database';
 
 type Tx = PgTransaction<any, any, any>;
 
@@ -24,6 +26,8 @@ export interface TenantScope {
    * also write `audit_logs` in the same transaction.
    */
   scoped: <T extends TenantTable>(table: T) => AuditedScoped<T>;
+  /** Audit a write made with `tx` directly (tables without `scoped()`). */
+  audit: (entry: Omit<AuditEntry, 'tenantId'>) => Promise<void>;
 }
 
 /**
@@ -103,6 +107,19 @@ export class TenantDatabase {
         tx,
         tenantId,
         scoped: (table) => auditedScoped(tx, table, tenantId, actor),
+        audit: async ({ entity, entityId, action, before, after }) => {
+          await tx.insert(auditLogs).values({
+            tenantId,
+            userId: actor.userId,
+            entity,
+            entityId,
+            action,
+            before: before === undefined ? null : maskSensitive(before),
+            after: after === undefined ? null : maskSensitive(after),
+            ip: actor.ip,
+            userAgent: actor.userAgent,
+          });
+        },
       });
     });
   }
