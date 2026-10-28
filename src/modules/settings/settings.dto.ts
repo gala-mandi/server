@@ -43,6 +43,7 @@ export const updateSettingsSchema = z
     email: z
       .email('Enter a valid email')
       .max(160)
+      .or(z.literal(''))
       .nullish()
       .transform((v) => v || null),
     address: optionalText(500),
@@ -74,8 +75,9 @@ export const updateSettingsSchema = z
       .transform((v) => v || null),
     financialYearStart: z.iso
       .date('Enter a date as YYYY-MM-DD')
+      .or(z.literal(''))
       .nullish()
-      .transform((v) => v ?? null),
+      .transform((v) => v || null),
   })
   .partial()
   .strict();

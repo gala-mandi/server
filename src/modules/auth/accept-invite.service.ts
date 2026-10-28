@@ -86,14 +86,9 @@ export class AcceptInviteService {
       }
 
       await lockPhone(tx, invite.phone);
-      const [taken] = await tx
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.phone, invite.phone))
-        .limit(1);
-      if (taken) throw phoneTaken();
-
-      // Claim the invite; a second request racing for it finds nothing.
+      // Claim the invite before the phone check: a second request racing
+      // for it waits on this row, then finds nothing (INVITE_USED, not
+      // PHONE_TAKEN). A taken phone below rolls the claim back.
       const [claimed] = await tx
         .update(invitations)
         .set({ acceptedAt: sql`now()` })
@@ -107,6 +102,13 @@ export class AcceptInviteService {
         )
         .returning({ acceptedAt: invitations.acceptedAt });
       if (!claimed) throw MESSAGES.accepted();
+
+      const [taken] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.phone, invite.phone))
+        .limit(1);
+      if (taken) throw phoneTaken();
 
       const [user] = await tx
         .insert(users)

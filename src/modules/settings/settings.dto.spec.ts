@@ -165,15 +165,13 @@ describe('updateSettingsSchema', () => {
       },
     );
 
-    it('email: null stays null', () => {
-      expect(parse({ email: null }).data).toEqual({ email: null });
-    });
-
-    it('financialYearStart: null stays null', () => {
-      expect(parse({ financialYearStart: null }).data).toEqual({
-        financialYearStart: null,
-      });
-    });
+    it.each(['email', 'financialYearStart'])(
+      '%s: "" and null → null',
+      (field) => {
+        expect(parse({ [field]: '' }).data).toEqual({ [field]: null });
+        expect(parse({ [field]: null }).data).toEqual({ [field]: null });
+      },
+    );
 
     it('trims optional text', () => {
       expect(parse({ city: '  Okara  ' }).data).toEqual({ city: 'Okara' });

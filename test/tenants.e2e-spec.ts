@@ -22,7 +22,10 @@ import { Fixtures, PASSWORD } from './support/fixtures';
 
 const BASE = '/admin/tenants';
 /** Unique per run, so searches only ever see this suite's shops. */
-const TAG = `zq${randomBytes(3).toString('hex')}`;
+// Letters only: digits in the tag would also match test shops' phone numbers.
+const TAG = `zq${randomBytes(3)
+  .toString('hex')
+  .replace(/\d/g, (d) => 'ghijklmnop'[Number(d)])}`;
 
 /** `03991234567` → `+92 399 1234567` (how people type it). */
 const intl = (phone: string) => `+92 ${phone.slice(1, 4)} ${phone.slice(4)}`;
