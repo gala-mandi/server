@@ -17,3 +17,6 @@ process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
 // Room for the auth suite; the throttle test reads the limit from config.
 process.env.THROTTLE_LIMIT = '300';
+// Fast password hashing for tests only (production refuses these values).
+process.env.ARGON2_MEMORY_KIB = '1024';
+process.env.ARGON2_TIME_COST = '1';
