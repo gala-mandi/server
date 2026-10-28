@@ -48,6 +48,6 @@ import { TokensService } from './tokens.service';
         new LogOtpSender(config.get('NODE_ENV', { infer: true })),
     },
   ],
-  exports: [AuthUsersService, PasswordService],
+  exports: [AuthUsersService, PasswordService, TokensService],
 })
 export class AuthModule {}

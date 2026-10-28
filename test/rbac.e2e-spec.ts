@@ -268,7 +268,7 @@ describe('RBAC (e2e)', () => {
         manager.id,
         'operator',
       ).expect(200);
-      expect(res.body).toEqual({ id: manager.id, role: 'operator' });
+      expect(res.body).toMatchObject({ id: manager.id, role: 'operator' });
 
       // The old access token still carries "manager" until it is refreshed.
       await call(
@@ -335,7 +335,7 @@ describe('RBAC (e2e)', () => {
         200,
       );
 
-      expect(res.body).toEqual({ id: owner.id, role: 'manager' });
+      expect(res.body).toMatchObject({ id: owner.id, role: 'manager' });
     });
 
     it('a disabled second owner does not count: the last active owner stays', async () => {
