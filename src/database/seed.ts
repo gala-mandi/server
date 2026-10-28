@@ -7,7 +7,7 @@ import * as argon2 from 'argon2';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
-import { tenants, users } from './schema';
+import { tenantSettings, tenants, users } from './schema';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -57,6 +57,12 @@ async function main(): Promise<void> {
       })
       .onConflictDoUpdate({ target: tenants.slug, set: { slug: 'demo-mandi' } })
       .returning({ id: tenants.id });
+
+    // Default settings, as every new shop gets them.
+    await db
+      .insert(tenantSettings)
+      .values({ tenantId: tenant.id, displayName: 'Demo Mandi' })
+      .onConflictDoNothing();
 
     await db
       .insert(users)

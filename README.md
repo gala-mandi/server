@@ -227,3 +227,15 @@ All need `tenant.manage` (super-admin). They run through `PlatformDatabase` (`sr
 - Staff endpoints need `staff.manage` (owner). One phone has one account in one shop: inviting a phone that already has an account gives `409 PHONE_TAKEN`.
 - Only the SHA-256 of the invite token is stored (`invitations.token_hash`). Links point to `WEB_APP_URL/accept-invite?token=…`.
 - No SMS/WhatsApp provider yet: in development the link is written to the server log (`src/modules/staff/invite-sender.ts`), like OTP codes.
+
+## Shop settings (owner)
+
+| Endpoint              | What it does                                                                                                                                                                                                                                                                                                            |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /settings`       | The shop profile (`name`, `phone`, `email`, `address`, `city`, `logoUrl` from `tenants`) and its `tenant_settings` in one object. A shop without a settings row gets the defaults (commission 0 %, unit kg, 1 maund = 40 kg, language en).                                                                              |
+| `PATCH /settings`     | Send only the fields that change. Percentages (`defaultCommissionPct`, `marketFeePct`, 0–100), money (`labourPerBag`) and `maundKg` are **strings** with up to 2 (3 for maund) decimals, never floats. `logoUrl` can only be set to `null` here (removes the logo). Unknown fields give `400`. Every change is audited. |
+| `POST /settings/logo` | `multipart/form-data` with one `file`. PNG or JPG only, checked by the file's bytes (a renamed PDF is refused): `400 INVALID_FILE_TYPE`. Over 1 MB: `413 FILE_TOO_LARGE`. Returns the settings with the new `logoUrl`.                                                                                                  |
+
+- All need `settings.manage` (owner); managers and operators get `403`.
+- New purchases will read the commission and charges from here when they are created; saved purchases keep the values stored on them.
+- **Logo storage** (`src/common/storage/`): `FileStorage` interface with two drivers. If `IMAGEKIT_PRIVATE_KEY` is set, logos go to ImageKit (upload REST API, folder `IMAGEKIT_FOLDER`). If not, they are written to `UPLOADS_DIR` and served by the API at `PUBLIC_API_URL/uploads/…`. Tests always use a temp folder.
