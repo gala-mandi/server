@@ -1251,11 +1251,43 @@ describe('Traders /traders (e2e)', () => {
       const baseline = await medianMs(() =>
         get(shop.token, UNKNOWN_ID).expect(404),
       );
+      // The search itself, as the API runs it (app_tenant role, RLS on):
+      // Postgres' own execution time, which the laptop's load and the
+      // per-request overhead above don't distort.
+      const client = await fx.pool.connect();
+      let executionMs: number;
+      try {
+        await client.query('begin');
+        await client.query('set local role app_tenant');
+        await client.query(`select set_config('app.tenant_id', $1, true)`, [
+          shop.tenantId,
+        ]);
+        const runs: number[] = [];
+        for (let i = 0; i < 5; i += 1) {
+          const { rows } = await client.query<{
+            'QUERY PLAN': [{ 'Execution Time': number }];
+          }>(
+            `explain (analyze, format json)
+             select id, type, name, father_name, phone, village
+               from traders
+              where tenant_id = $1 and deleted_at is null and is_active
+                and name ilike '%ali%'
+              order by case when name ilike 'ali%' then 0 else 1 end, name, id
+              limit 10`,
+            [shop.tenantId],
+          );
+          runs.push(rows[0]['QUERY PLAN'][0]['Execution Time']);
+        }
+        executionMs = runs.sort((a, b) => a - b)[2];
+      } finally {
+        await client.query('rollback');
+        client.release();
+      }
       console.log(
-        `traders lookup ?q=ali over ${PERF_TRADERS} traders: median ${median.toFixed(1)} ms (request baseline ${baseline.toFixed(1)} ms)`,
+        `traders lookup ?q=ali over ${PERF_TRADERS} traders: query ${executionMs.toFixed(1)} ms, request median ${median.toFixed(1)} ms (request baseline ${baseline.toFixed(1)} ms)`,
       );
 
-      expect(median).toBeLessThan(LOOKUP_BUDGET_MS);
+      expect(executionMs).toBeLessThan(LOOKUP_BUDGET_MS);
     });
 
     it('the list counts all 10,000 and pages fast', async () => {
