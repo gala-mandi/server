@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import * as argon2 from 'argon2';
+import { argon2Options } from '../../src/modules/auth/password.service';
 import { inArray, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
@@ -57,7 +58,7 @@ export class Fixtures {
     tenantId: string | null,
     extra: Partial<typeof users.$inferInsert> = {},
   ) {
-    this.passwordHash ??= argon2.hash(PASSWORD);
+    this.passwordHash ??= argon2.hash(PASSWORD, argon2Options());
     const phone = this.phone();
     const [row] = await this.db
       .insert(users)

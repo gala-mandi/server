@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import express from 'express';
 import helmet from 'helmet';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import type { Env } from './config/env.schema';
@@ -22,6 +23,23 @@ export function configureApp(app: INestApplication): void {
     exposedHeaders: ['Retry-After', 'X-RateLimit-Remaining'],
   });
   app.enableShutdownHooks();
+
+  // Logos saved on local disk (no ImageKit key). Other origins (the web
+  // panel) may show them as images; nothing else is served from here.
+  if (!config.get('IMAGEKIT_PRIVATE_KEY', { infer: true })) {
+    app.use(
+      '/uploads',
+      express.static(config.get('UPLOADS_DIR', { infer: true }), {
+        dotfiles: 'deny',
+        index: false,
+        redirect: false,
+        setHeaders: (res) => {
+          res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        },
+      }),
+    );
+  }
 
   const document = SwaggerModule.createDocument(
     app,

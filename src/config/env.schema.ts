@@ -27,6 +27,12 @@ export const envSchema = z.object({
   COOKIE_DOMAIN: z.string().min(1).optional(),
   /** Shop panel address, used to build staff invite links. */
   WEB_APP_URL: z.url().default('http://localhost:3000'),
+  /** Public address of this API, used for files served from `/uploads`. */
+  PUBLIC_API_URL: z.url().default('http://localhost:4000'),
+  /** Logo storage: ImageKit when the private key is set, else local disk. */
+  IMAGEKIT_PRIVATE_KEY: z.string().min(1).optional(),
+  IMAGEKIT_FOLDER: z.string().startsWith('/').default('/galla-mandi'),
+  UPLOADS_DIR: z.string().min(1).default('uploads'),
   OTP_SECRET: z.string().min(32),
   LOGIN_THROTTLE_LIMIT: z.coerce.number().int().positive().default(5),
   LOGIN_THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60_000),

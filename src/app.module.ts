@@ -16,6 +16,7 @@ import { DatabaseModule } from './database/database.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { UsersModule } from './modules/users/users.module';
@@ -65,6 +66,7 @@ import { UsersModule } from './modules/users/users.module';
     AuditModule,
     TenantsModule,
     StaffModule,
+    SettingsModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

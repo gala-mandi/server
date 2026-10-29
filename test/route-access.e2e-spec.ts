@@ -76,6 +76,9 @@ describe('Route access metadata (e2e)', () => {
         'AuthController.login',
         'AuthController.me',
         'HealthController.check',
+        'SettingsController.get',
+        'SettingsController.update',
+        'SettingsController.uploadLogo',
       ]),
     );
   });
@@ -84,6 +87,15 @@ describe('Route access metadata (e2e)', () => {
     const missing = handlers.filter((h) => !h.access).map((h) => h.name);
 
     expect(missing).toEqual([]);
+  });
+
+  it('the settings routes need a permission', () => {
+    const settings = handlers.filter((h) =>
+      h.name.startsWith('SettingsController.'),
+    );
+
+    expect(settings).toHaveLength(3);
+    expect(settings.every((h) => h.access === 'permissions')).toBe(true);
   });
 
   it('only the expected routes are public', () => {
