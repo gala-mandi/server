@@ -65,8 +65,10 @@ describe('permission matrix', () => {
     }
   });
 
-  it('operator: create purchases, sales, payments and view rates only', () => {
+  it('operator: create purchases, sales, payments and traders; view rates', () => {
     for (const p of [
+      'trader.view',
+      'trader.create',
       'purchase.create',
       'sale.create',
       'payment.create',
@@ -78,6 +80,7 @@ describe('permission matrix', () => {
       'purchase.edit',
       'sale.edit',
       'payment.edit',
+      'trader.manage',
       'rate.manage',
       'report.view',
       'ledger.view',
@@ -90,7 +93,7 @@ describe('permission matrix', () => {
   });
 
   it.each<[Role, number]>([
-    ['operator', 10],
+    ['operator', 11],
     ['super_admin', 3],
   ])('%s has exactly %i permissions', (role, count) => {
     expect(permissionsFor(role)).toHaveLength(count);
