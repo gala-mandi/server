@@ -131,9 +131,13 @@ export class TradersService implements OnModuleInit {
       const filters: SQL[] = [eq(traders.isActive, true)];
       if (query.type) filters.push(eq(traders.type, query.type));
       if (query.q) filters.push(this.searchFilter(query.q));
+      // Names starting with q first. Without q there is nothing to rank
+      // (a constant would be `order by 0`, which Postgres rejects).
       const startsWith = query.q
-        ? sql`case when ${traders.name} ilike ${likePattern(query.q).slice(1)} then 0 else 1 end`
-        : sql`0`;
+        ? [
+            sql`case when ${traders.name} ilike ${likePattern(query.q).slice(1)} then 0 else 1 end`,
+          ]
+        : [];
       return tx
         .select({
           id: traders.id,
@@ -145,7 +149,7 @@ export class TradersService implements OnModuleInit {
         })
         .from(traders)
         .where(scoped(traders).where(and(...filters)))
-        .orderBy(startsWith, asc(traders.name), asc(traders.id))
+        .orderBy(...startsWith, asc(traders.name), asc(traders.id))
         .limit(query.limit);
     });
   }
@@ -321,9 +325,11 @@ export class TradersService implements OnModuleInit {
         createdBy: entry.userId,
       })
       .returning();
+    // audit_logs.entity_id is a uuid and ledger ids are bigserial: log the
+    // entry under its trader (the row, with its id, is in `after`).
     await audit({
       entity: 'ledger_entries',
-      entityId: String(row.id),
+      entityId: entry.traderId,
       action: 'create',
       after: row,
     });

@@ -36,7 +36,10 @@ const phone = z
   .nullish()
   .transform((v) => v || null)
   .refine(
-    (v) => v === null || /^[+\d][\d\s-]{6,19}$/.test(v),
+    // At least 7 digits: "+------" would otherwise be stored as "".
+    (v) =>
+      v === null ||
+      (/^[+\d][\d\s-]{6,19}$/.test(v) && v.replace(/\D/g, '').length >= 7),
     'Enter a valid phone number',
   )
   .transform((v) => (v === null ? null : normalizeTraderPhone(v)));

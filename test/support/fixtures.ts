@@ -9,10 +9,12 @@ import {
   auditLogs,
   authLogs,
   invitations,
+  ledgerEntries,
   otpCodes,
   refreshTokens,
   tenantSettings,
   tenants,
+  traders,
   users,
 } from '../../src/database/schema';
 
@@ -122,6 +124,11 @@ export class Fixtures {
             inArray(invitations.invitedBy, ids),
           ),
         );
+      // Khata and traders of tracked shops (before their users and shops).
+      await this.db
+        .delete(ledgerEntries)
+        .where(inArray(ledgerEntries.tenantId, tIds));
+      await this.db.delete(traders).where(inArray(traders.tenantId, tIds));
       await this.db.delete(otpCodes).where(inArray(otpCodes.userId, ids));
       await this.db
         .delete(refreshTokens)
