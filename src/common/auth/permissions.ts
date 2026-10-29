@@ -19,6 +19,7 @@ export const PERMISSIONS = [
   'staff.manage',
   'settings.manage',
   'trader.view',
+  'trader.create',
   'trader.manage',
   'trader.delete',
   'commodity.view',
@@ -60,8 +61,8 @@ const SHOP: readonly Permission[] = PERMISSIONS.filter(
  * - super_admin: platform only, no daily shop entries
  * - owner: everything in the shop, incl. staff, settings, delete, reports
  * - manager: daily work + reports; no staff, settings, delete or audit log
- * - operator: create purchases, sales, payments; view rates (and the traders
- *   and commodities a purchase needs); no edit, delete or reports
+ * - operator: create purchases, sales, payments and traders; view rates (and
+ *   the traders and commodities a purchase needs); no edit, delete or reports
  */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   super_admin: PLATFORM,
@@ -77,6 +78,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'dashboard.view',
     'rate.view',
     'trader.view',
+    'trader.create',
     'commodity.view',
     'purchase.view',
     'purchase.create',

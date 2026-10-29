@@ -50,6 +50,13 @@
       "when": 1793127309830,
       "tag": "0006_invitations",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793249602386,
+      "tag": "0007_traders",
+      "breakpoints": true
     }
   ]
 }

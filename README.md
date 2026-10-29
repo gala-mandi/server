@@ -239,3 +239,17 @@ All need `tenant.manage` (super-admin). They run through `PlatformDatabase` (`sr
 - All need `settings.manage` (owner); managers and operators get `403`.
 - New purchases will read the commission and charges from here when they are created; saved purchases keep the values stored on them.
 - **Logo storage** (`src/common/storage/`): `FileStorage` interface with two drivers. If `IMAGEKIT_PRIVATE_KEY` is set, logos go to ImageKit (upload REST API, folder `IMAGEKIT_FOLDER`). If not, they are written to `UPLOADS_DIR` and served by the API at `PUBLIC_API_URL/uploads/…`. Tests always use a temp folder.
+
+## Traders (kissan, beopari, arhti)
+
+| Endpoint                 | Permission      | What it does                                                                                                                                                                                                                      |
+| ------------------------ | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /traders`           | `trader.view`   | `page`, `limit` (max 100), `search` (name, or phone digits), `type`, `active=true\|false`, `sort` (`name`, `-name`, `createdAt`, `-createdAt`). Returns `{ data, meta: { page, limit, total } }`.                                 |
+| `GET /traders/lookup?q=` | `trader.view`   | Fast picker search for purchase and sale forms: active traders only, names starting with `q` first, `type` and `limit` (max 50). Uses the `pg_trgm` index on `name`.                                                              |
+| `POST /traders`          | `trader.create` | Operator, manager, owner. An opening balance above 0 writes the first khata entry (`ledger_entries`, `source_type = opening`, debit or credit). Same phone twice in one shop: `409 PHONE_TAKEN` (other shops may reuse it).       |
+| `GET /traders/:id`       | `trader.view`   | The trader plus `balance` (debit minus credit of the khata, as a string; negative = the shop owes the trader).                                                                                                                    |
+| `PATCH /traders/:id`     | `trader.manage` | Manager, owner. A changed opening balance adds a `reversal` entry and a new `opening` entry; the khata is never edited.                                                                                                           |
+| `DELETE /traders/:id`    | `trader.delete` | Owner. Soft delete; refused with `409 TRADER_HAS_TRANSACTIONS` once the khata has anything besides the opening balance (deactivate with `PATCH { isActive: false }` instead). Restorable via `POST /records/traders/:id/restore`. |
+
+- Phones are stored as digits (`+92 300 1234567` → `03001234567`); CNIC as `12345-1234567-1`. Money is a string with up to 2 decimals.
+- `trader.create` is a new permission: operators may add traders (e.g. from the purchase form) but not edit or delete them.
