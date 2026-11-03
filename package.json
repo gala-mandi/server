@@ -102,7 +102,7 @@
     "testEnvironment": "node"
   },
   "engines": {
-    "node": "24.x"
+    "node": ">=22.12"
   },
   "lint-staged": {
     "*.{ts,mjs,js}": [
