@@ -14,8 +14,8 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "prepare": "husky",
-    "start": "nest start",
+    "prepare": "husky || true",
+    "start": "node dist/main",
     "start:debug": "nest start --debug --watch",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
@@ -102,7 +102,7 @@
     "testEnvironment": "node"
   },
   "engines": {
-    "node": ">=22.12"
+    "node": "24.x"
   },
   "lint-staged": {
     "*.{ts,mjs,js}": [
