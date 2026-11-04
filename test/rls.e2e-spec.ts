@@ -257,6 +257,10 @@ describe('Row-Level Security (integration)', () => {
       expect(rows.map((r) => r.table)).toContain('tenant_settings');
       // Staff invites (migration 0006).
       expect(rows.map((r) => r.table)).toContain('invitations');
+      // Traders and their khata (migration 0007).
+      expect(rows.map((r) => r.table)).toEqual(
+        expect.arrayContaining(['traders', 'ledger_entries']),
+      );
 
       const unprotected = rows.filter(
         (r) =>

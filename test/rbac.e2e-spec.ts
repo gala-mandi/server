@@ -167,6 +167,16 @@ describe('RBAC (e2e)', () => {
       expect(res.body).toEqual({ statusCode: 403, message: NO_ACCESS });
     });
 
+    it('operator adds a trader (trader.create) but super-admin cannot', async () => {
+      await call(probe('trader.create'), sessions.operator.accessToken).expect(
+        201,
+      );
+      await call(
+        probe('trader.create'),
+        sessions.super_admin.accessToken,
+      ).expect(403);
+    });
+
     it('manager opens staff management → 403', async () => {
       const res = await call(
         { method: 'get', path: '/rbac-probe/staff' },

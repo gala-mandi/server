@@ -15,6 +15,7 @@ import { createTestApp } from './create-app';
 interface Handler {
   name: string;
   access: 'public' | 'roles' | 'permissions' | null;
+  permissions: string[];
 }
 
 /**
@@ -59,7 +60,12 @@ describe('Route access metadata (e2e)', () => {
               : has(ROLES_KEY)
                 ? 'roles'
                 : null;
-          return { name: `${controller.name}.${fn.name}`, access };
+          const permissions =
+            reflector.getAllAndOverride<string[] | undefined>(
+              PERMISSIONS_KEY,
+              targets,
+            ) ?? [];
+          return { name: `${controller.name}.${fn.name}`, access, permissions };
         });
     });
   });
@@ -79,6 +85,12 @@ describe('Route access metadata (e2e)', () => {
         'SettingsController.get',
         'SettingsController.update',
         'SettingsController.uploadLogo',
+        'TradersController.list',
+        'TradersController.lookup',
+        'TradersController.create',
+        'TradersController.get',
+        'TradersController.update',
+        'TradersController.remove',
       ]),
     );
   });
@@ -96,6 +108,23 @@ describe('Route access metadata (e2e)', () => {
 
     expect(settings).toHaveLength(3);
     expect(settings.every((h) => h.access === 'permissions')).toBe(true);
+  });
+
+  it('the trader routes need their own permission', () => {
+    const traders = Object.fromEntries(
+      handlers
+        .filter((h) => h.name.startsWith('TradersController.'))
+        .map((h) => [h.name.split('.')[1], h.permissions]),
+    );
+
+    expect(traders).toEqual({
+      list: ['trader.view'],
+      lookup: ['trader.view'],
+      get: ['trader.view'],
+      create: ['trader.create'],
+      update: ['trader.manage'],
+      remove: ['trader.delete'],
+    });
   });
 
   it('only the expected routes are public', () => {

@@ -61,6 +61,13 @@ export const PROBE_ROUTES: readonly ProbeRoute[] = [
     ok: 200,
   },
   {
+    method: 'post',
+    path: '/rbac-probe/traders',
+    permission: 'trader.create',
+    shop: true,
+    ok: 201,
+  },
+  {
     method: 'get',
     path: '/rbac-probe/staff',
     permission: 'staff.manage',
@@ -141,6 +148,12 @@ class RbacShopProbeController {
   @Delete('purchases/:id')
   @Permissions('purchase.delete')
   deletePurchase() {
+    return ok();
+  }
+
+  @Post('traders')
+  @Permissions('trader.create')
+  createTrader() {
     return ok();
   }
 
