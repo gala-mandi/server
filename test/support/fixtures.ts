@@ -8,6 +8,7 @@ import * as schema from '../../src/database/schema';
 import {
   auditLogs,
   authLogs,
+  commodities,
   invitations,
   ledgerEntries,
   otpCodes,
@@ -124,11 +125,15 @@ export class Fixtures {
             inArray(invitations.invitedBy, ids),
           ),
         );
-      // Khata and traders of tracked shops (before their users and shops).
+      // Khata, traders and commodities of tracked shops (before their users
+      // and shops).
       await this.db
         .delete(ledgerEntries)
         .where(inArray(ledgerEntries.tenantId, tIds));
       await this.db.delete(traders).where(inArray(traders.tenantId, tIds));
+      await this.db
+        .delete(commodities)
+        .where(inArray(commodities.tenantId, tIds));
       await this.db.delete(otpCodes).where(inArray(otpCodes.userId, ids));
       await this.db
         .delete(refreshTokens)

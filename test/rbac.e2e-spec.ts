@@ -177,6 +177,20 @@ describe('RBAC (e2e)', () => {
       ).expect(403);
     });
 
+    it('operator sees commodities (commodity.view) but cannot add one; manager can', async () => {
+      await call(probe('commodity.view'), sessions.operator.accessToken).expect(
+        200,
+      );
+      await call(
+        probe('commodity.manage'),
+        sessions.operator.accessToken,
+      ).expect(403);
+      await call(
+        probe('commodity.manage'),
+        sessions.manager.accessToken,
+      ).expect(201);
+    });
+
     it('manager opens staff management → 403', async () => {
       const res = await call(
         { method: 'get', path: '/rbac-probe/staff' },

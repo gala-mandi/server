@@ -7,11 +7,16 @@ import type {
 } from '../../database/platform-database';
 import {
   auditLogs,
+  commodities,
   tenantSettings,
   tenants,
   users,
 } from '../../database/schema';
 import type { PasswordService } from '../auth/password.service';
+import {
+  DEFAULT_COMMODITIES,
+  defaultCommodityRows,
+} from '../commodities/default-commodities';
 import type { CreateTenantInput } from './tenants.dto';
 import { slugify, temporaryPassword, TenantsService } from './tenants.service';
 
@@ -120,7 +125,9 @@ const tableName = (table: PgTable): string =>
         ? 'tenant_settings'
         : table === auditLogs
           ? 'audit_logs'
-          : 'unknown';
+          : table === commodities
+            ? 'commodities'
+            : 'unknown';
 
 /**
  * A Drizzle query that can be chained (`.from().where().limit()` …) and
@@ -199,11 +206,16 @@ function fakePlatform(options: FakeOptions = {}) {
     [ownerRow],
     [{ tenantId: SHOP, n: 1 }],
   ];
-  const inserted: Record<string, unknown> = {
-    tenants: tenantRow,
-    users: ownerRow,
-    tenant_settings: { tenantId: SHOP, displayName: tenantRow.name },
+  const inserted: Record<string, unknown[]> = {
+    tenants: [tenantRow],
+    users: [ownerRow],
+    tenant_settings: [{ tenantId: SHOP, displayName: tenantRow.name }],
+    commodities: defaultCommodityRows(SHOP).map((row, i) => ({
+      ...row,
+      id: `c0000000-0000-4000-8000-00000000000${i}`,
+    })),
   };
+  const values: Record<string, unknown> = {};
 
   const tx = {
     select: () =>
@@ -211,13 +223,21 @@ function fakePlatform(options: FakeOptions = {}) {
         steps.push({ kind: 'select' });
         return selects.shift() ?? [];
       }),
-    insert: (table: PgTable) =>
-      query(() => {
-        const name = tableName(table);
+    insert: (table: PgTable) => {
+      const name = tableName(table);
+      const chain = query(() => {
         if (options.failInsert?.table === name) throw options.failInsert.error;
         steps.push({ kind: 'insert', table: name });
-        return [inserted[name]];
-      }),
+        return inserted[name];
+      }) as { values: unknown };
+      // Remember what was inserted, then go on with the chain.
+      return {
+        values: (v: unknown) => {
+          values[name] = v;
+          return chain;
+        },
+      };
+    },
   };
   const audit = jest.fn((entry: AuditEntry) => {
     if (options.failAudit?.entity === entry.entity) {
@@ -244,7 +264,7 @@ function fakePlatform(options: FakeOptions = {}) {
       },
     ),
   };
-  return { platform, steps, audit };
+  return { platform, steps, audit, values };
 }
 
 function serviceWith(fake: ReturnType<typeof fakePlatform>) {
@@ -283,7 +303,7 @@ function uniqueViolation(constraint: string): Error {
 }
 
 describe('TenantsService.create()', () => {
-  it('baseline: tenant, owner and settings plus 3 audit rows, then commit', async () => {
+  it('baseline: tenant, owner, settings and default commodities, each audited, then commit', async () => {
     const fake = fakePlatform();
     const { service, passwords } = serviceWith(fake);
 
@@ -294,14 +314,47 @@ describe('TenantsService.create()', () => {
       { kind: 'insert', table: 'tenants' },
       { kind: 'insert', table: 'users' },
       { kind: 'insert', table: 'tenant_settings' },
+      { kind: 'insert', table: 'commodities' },
       { kind: 'audit', entity: 'tenants' },
       { kind: 'audit', entity: 'users' },
       { kind: 'audit', entity: 'tenant_settings' },
+      // One create audit row per default commodity.
+      ...DEFAULT_COMMODITIES.map(() => ({
+        kind: 'audit',
+        entity: 'commodities',
+      })),
       { kind: 'commit' },
     ]);
     expect(result.temporaryPassword).toMatch(ALPHABET);
     expect(passwords.hash).toHaveBeenCalledWith(result.temporaryPassword);
     expect(result.tenant).toMatchObject({ id: SHOP, status: 'trial' });
+  });
+
+  it('the new shop gets the default commodity list (maund, no bag weight)', async () => {
+    const fake = fakePlatform();
+    const { service } = serviceWith(fake);
+
+    await service.create(input);
+
+    const rows = fake.values.commodities as Record<string, unknown>[];
+    expect(rows.map((r) => r.name)).toEqual([
+      'Gandum',
+      'Kapas',
+      'Chawal',
+      'Dhaan',
+      'Makai',
+      'Chana',
+      'Sarson',
+      'Sabzi',
+    ]);
+    for (const row of rows) {
+      expect(row).toMatchObject({
+        tenantId: SHOP,
+        defaultUnit: 'maund',
+        bagWeightKg: null,
+      });
+      expect(row.nameUr).toEqual(expect.any(String));
+    }
   });
 
   it.each([
@@ -310,6 +363,11 @@ describe('TenantsService.create()', () => {
     ['the tenants audit row', { failAudit: { entity: 'tenants' } }],
     ['the users audit row', { failAudit: { entity: 'users' } }],
     ['the settings audit row', { failAudit: { entity: 'tenant_settings' } }],
+    [
+      'the default commodities insert',
+      { failInsert: { table: 'commodities' } },
+    ],
+    ['a commodity audit row', { failAudit: { entity: 'commodities' } }],
   ])(
     'when %s fails: the transaction rolls back, the error is rethrown and no password is returned',
     async (_label, where) => {

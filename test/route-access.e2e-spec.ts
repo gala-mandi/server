@@ -127,6 +127,23 @@ describe('Route access metadata (e2e)', () => {
     });
   });
 
+  it('the commodity routes need their own permission', () => {
+    const commodities = Object.fromEntries(
+      handlers
+        .filter((h) => h.name.startsWith('CommoditiesController.'))
+        .map((h) => [h.name.split('.')[1], h.permissions]),
+    );
+
+    expect(commodities).toEqual({
+      list: ['commodity.view'],
+      lookup: ['commodity.view'],
+      get: ['commodity.view'],
+      create: ['commodity.manage'],
+      update: ['commodity.manage'],
+      remove: ['commodity.delete'],
+    });
+  });
+
   it('only the expected routes are public', () => {
     const open = handlers
       .filter((h) => h.access === 'public')

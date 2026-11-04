@@ -261,6 +261,8 @@ describe('Row-Level Security (integration)', () => {
       expect(rows.map((r) => r.table)).toEqual(
         expect.arrayContaining(['traders', 'ledger_entries']),
       );
+      // Commodities (migration 0008).
+      expect(rows.map((r) => r.table)).toContain('commodities');
 
       const unprotected = rows.filter(
         (r) =>
