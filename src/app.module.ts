@@ -15,6 +15,7 @@ import { type Env, validateEnv } from './config/env.schema';
 import { DatabaseModule } from './database/database.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CommoditiesModule } from './modules/commodities/commodities.module';
 import { HealthModule } from './modules/health/health.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { StaffModule } from './modules/staff/staff.module';
@@ -69,6 +70,7 @@ import { UsersModule } from './modules/users/users.module';
     StaffModule,
     SettingsModule,
     TradersModule,
+    CommoditiesModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

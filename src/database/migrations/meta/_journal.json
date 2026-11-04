@@ -57,6 +57,13 @@
       "when": 1793249602386,
       "tag": "0007_traders",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793822089718,
+      "tag": "0008_commodities",
+      "breakpoints": true
     }
   ]
 }

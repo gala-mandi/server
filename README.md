@@ -253,3 +253,19 @@ All need `tenant.manage` (super-admin). They run through `PlatformDatabase` (`sr
 
 - Phones are stored as digits (`+92 300 1234567` → `03001234567`); CNIC as `12345-1234567-1`. Money is a string with up to 2 decimals.
 - `trader.create` is a new permission: operators may add traders (e.g. from the purchase form) but not edit or delete them.
+
+## Commodities (gandum, kapas, …)
+
+| Endpoint                     | Permission         | What it does                                                                                                                                                                                                               |
+| ---------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /commodities`           | `commodity.view`   | `page`, `limit` (max 100), `search` (name or Urdu name), `category`, `active=true\|false`, `sort` (`name`, `-name`, `createdAt`, `-createdAt`). Returns `{ data, meta: { page, limit, total } }`.                          |
+| `GET /commodities/lookup?q=` | `commodity.view`   | Picker for rate, purchase and sale forms: active only, names starting with `q` first, `limit` (max 50). Each item has `charges`: the commission %, market fee % and labour per bag that apply.                             |
+| `POST /commodities`          | `commodity.manage` | Manager, owner. Same name twice in one shop: `409 NAME_TAKEN` (other shops may reuse it; a deleted commodity keeps its name).                                                                                              |
+| `GET /commodities/:id`       | `commodity.view`   | One commodity, including its own (override) charges.                                                                                                                                                                       |
+| `PATCH /commodities/:id`     | `commodity.manage` | Manager, owner. `null` (or `""`) on a charge goes back to the shop default.                                                                                                                                                |
+| `DELETE /commodities/:id`    | `commodity.delete` | Owner. Soft delete; `409 COMMODITY_IN_USE` once rates, purchases or sales use it (checks added with those tables), deactivate with `PATCH { isActive: false }` instead. Restorable via `/records/commodities/:id/restore`. |
+
+- `default_unit` is `kg`, `maund` or `bag`; `bagWeightKg` up to 99999.999 kg. Percentages are strings 0–100 with 2 decimals, money up to 2 decimals.
+- Charges: the commodity's value when set, else `tenant_settings` (`effectiveCharges()` in `src/modules/commodities/effective-charges.ts`). `"0"` is a real override.
+- New shops (created by the super-admin) start with an editable list: Gandum, Kapas, Chawal, Dhaan, Makai, Chana, Sarson, Sabzi (`default-commodities.ts`). Existing shops are not back-filled; `npm run db:seed` adds it to Demo Mandi.
+- Weights: `src/common/units/units.ts` converts kg ↔ maund (the shop's `maund_kg`) ↔ bags with `decimal.js`, strings in and out: `kgToMaund('1010', '40')` → `{ maund: '25', kg: '10.000', totalMaund: '25.250' }`, `formatWeight('1010', '40')` → `25 mn 10 kg`. Labels live in `UNIT_LABELS`.

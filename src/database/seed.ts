@@ -1,13 +1,16 @@
 /**
- * Local development seed: one super-admin and one demo shop with an owner.
+ * Local development seed: one super-admin and one demo shop with an owner
+ * and the default commodity list.
  * Safe to run again; existing rows are left as they are.
  * Usage: npm run db:seed (reads .env)
  */
 import * as argon2 from 'argon2';
+import { count, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
-import { tenantSettings, tenants, users } from './schema';
+import { commodities, tenantSettings, tenants, users } from './schema';
+import { defaultCommodityRows } from '../modules/commodities/default-commodities';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -63,6 +66,16 @@ async function main(): Promise<void> {
       .insert(tenantSettings)
       .values({ tenantId: tenant.id, displayName: 'Demo Mandi' })
       .onConflictDoNothing();
+
+    // Default commodities, as every new shop gets them. Only for a shop with
+    // none at all (deleted ones count), so the owner's edits stay.
+    const [{ existing }] = await db
+      .select({ existing: count() })
+      .from(commodities)
+      .where(eq(commodities.tenantId, tenant.id));
+    if (existing === 0) {
+      await db.insert(commodities).values(defaultCommodityRows(tenant.id));
+    }
 
     await db
       .insert(users)
