@@ -18,6 +18,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import {
+  commodities,
   refreshTokens,
   tenantSettings,
   tenants,
@@ -29,6 +30,7 @@ import {
 } from '../../database/platform-database';
 import { diffChanges } from '../../database/audit/audit-diff';
 import { normalizePhone } from '../auth/identifier';
+import { defaultCommodityRows } from '../commodities/default-commodities';
 import { PasswordService } from '../auth/password.service';
 import type {
   CreateTenantInput,
@@ -134,7 +136,10 @@ export class TenantsService {
     return this.platform.transaction(({ tx }) => this.detail(tx, id));
   }
 
-  /** Shop + owner (temporary password) + default settings, all or nothing. */
+  /**
+   * Shop + owner (temporary password) + default settings + default
+   * commodity list, all or nothing.
+   */
   async create(
     input: CreateTenantInput,
   ): Promise<{ tenant: TenantDetail; temporaryPassword: string }> {
@@ -216,6 +221,11 @@ export class TenantsService {
         .insert(tenantSettings)
         .values({ tenantId: tenant.id, displayName: input.name })
         .returning();
+      // Editable starting list (gandum, kapas, …); not added to older shops.
+      const starter = await tx
+        .insert(commodities)
+        .values(defaultCommodityRows(tenant.id))
+        .returning();
 
       await audit({
         tenantId: tenant.id,
@@ -238,6 +248,15 @@ export class TenantsService {
         action: 'create',
         after: settings,
       });
+      for (const row of starter) {
+        await audit({
+          tenantId: tenant.id,
+          entity: 'commodities',
+          entityId: row.id,
+          action: 'create',
+          after: row,
+        });
+      }
 
       return {
         tenant: await this.detail(tx, tenant.id),

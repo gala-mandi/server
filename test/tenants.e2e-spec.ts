@@ -6,12 +6,14 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import {
   auditLogs,
+  commodities,
   refreshTokens,
   tenantSettings,
   tenants,
   users,
 } from '../src/database/schema';
 import { OTP_SENDER } from '../src/modules/auth/otp/otp-sender';
+import { DEFAULT_COMMODITIES } from '../src/modules/commodities/default-commodities';
 import { slugify } from '../src/modules/tenants/tenants.service';
 import type {
   TenantDetail,
@@ -106,7 +108,11 @@ describe('Shops admin /admin/tenants (e2e)', () => {
   }
 
   const countOf = async (
-    table: typeof tenants | typeof tenantSettings | typeof users,
+    table:
+      | typeof tenants
+      | typeof tenantSettings
+      | typeof users
+      | typeof commodities,
   ) => (await fx.db.select({ n: count() }).from(table))[0].n;
 
   const settingsOf = async (tenantId: string) =>
@@ -236,18 +242,33 @@ describe('Shops admin /admin/tenants (e2e)', () => {
       expect((await login(body.owner.phone)).status).toBe(401);
     });
 
-    it('writes create audit rows for tenants, users and tenant_settings, password hash redacted', async () => {
+    it('writes create audit rows for tenants, users, tenant_settings and the default commodities, password hash redacted', async () => {
       const { tenant } = await createOk();
 
       const rows = await auditOf(tenant.id);
+      const starter = await fx.db
+        .select({ id: commodities.id })
+        .from(commodities)
+        .where(eq(commodities.tenantId, tenant.id));
 
       expect(
-        rows.map((r) => [r.entity, r.entityId, r.action, r.userId]),
+        rows.slice(0, 3).map((r) => [r.entity, r.entityId, r.action, r.userId]),
       ).toEqual([
         ['tenants', tenant.id, 'create', adminId],
         ['users', tenant.owner!.id, 'create', adminId],
         ['tenant_settings', tenant.id, 'create', adminId],
       ]);
+      // One create row per default commodity, after the settings row.
+      expect(starter).toHaveLength(DEFAULT_COMMODITIES.length);
+      expect(rows.slice(3).map((r) => [r.entity, r.action, r.userId])).toEqual(
+        starter.map(() => ['commodities', 'create', adminId]),
+      );
+      expect(
+        rows
+          .slice(3)
+          .map((r) => r.entityId)
+          .sort(),
+      ).toEqual(starter.map((c) => c.id).sort());
       const [shop, owner, settings] = rows;
       expect(shop.before).toBeNull();
       expect(shop.after).toMatchObject({ id: tenant.id, status: 'trial' });
@@ -427,7 +448,7 @@ describe('Shops admin /admin/tenants (e2e)', () => {
     afterAll(() => logError.mockRestore());
 
     async function withFailingTrigger(
-      table: 'tenant_settings' | 'audit_logs',
+      table: 'tenant_settings' | 'audit_logs' | 'commodities',
       when: string,
       fn: () => Promise<void>,
     ) {
@@ -461,6 +482,27 @@ describe('Shops admin /admin/tenants (e2e)', () => {
         ]),
       ).toEqual(before);
     }
+
+    it('a default commodity insert fails after the settings insert → 500, nothing kept', async () => {
+      const body = shopBody({ name: `Rollback Commodities ${TAG}` });
+      const before = await Promise.all([
+        countOf(tenants),
+        countOf(tenantSettings),
+        countOf(users),
+      ]);
+      const commoditiesBefore = await countOf(commodities);
+
+      await withFailingTrigger(
+        'commodities',
+        `new.name = 'Sabzi'`,
+        async () => {
+          expect((await createShop(body)).status).toBe(500);
+        },
+      );
+
+      await expectNothingCreated(body, before);
+      expect(await countOf(commodities)).toBe(commoditiesBefore);
+    });
 
     it('settings insert fails after tenant + owner inserts → 500, nothing kept', async () => {
       const body = shopBody({ name: `Rollback Settings ${TAG}` });

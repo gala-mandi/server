@@ -69,6 +69,20 @@ export const PROBE_ROUTES: readonly ProbeRoute[] = [
   },
   {
     method: 'get',
+    path: '/rbac-probe/commodities',
+    permission: 'commodity.view',
+    shop: true,
+    ok: 200,
+  },
+  {
+    method: 'post',
+    path: '/rbac-probe/commodities',
+    permission: 'commodity.manage',
+    shop: true,
+    ok: 201,
+  },
+  {
+    method: 'get',
     path: '/rbac-probe/staff',
     permission: 'staff.manage',
     shop: true,
@@ -154,6 +168,18 @@ class RbacShopProbeController {
   @Post('traders')
   @Permissions('trader.create')
   createTrader() {
+    return ok();
+  }
+
+  @Get('commodities')
+  @Permissions('commodity.view')
+  commodities() {
+    return ok();
+  }
+
+  @Post('commodities')
+  @Permissions('commodity.manage')
+  createCommodity() {
     return ok();
   }
 
