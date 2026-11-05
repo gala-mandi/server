@@ -11,6 +11,7 @@ import {
   commodities,
   invitations,
   ledgerEntries,
+  numberSequences,
   otpCodes,
   refreshTokens,
   tenantSettings,
@@ -125,7 +126,7 @@ export class Fixtures {
             inArray(invitations.invitedBy, ids),
           ),
         );
-      // Khata, traders and commodities of tracked shops (before their users
+      // Khata, traders, commodities and bill numbers of tracked shops (before their users
       // and shops).
       await this.db
         .delete(ledgerEntries)
@@ -134,6 +135,9 @@ export class Fixtures {
       await this.db
         .delete(commodities)
         .where(inArray(commodities.tenantId, tIds));
+      await this.db
+        .delete(numberSequences)
+        .where(inArray(numberSequences.tenantId, tIds));
       await this.db.delete(otpCodes).where(inArray(otpCodes.userId, ids));
       await this.db
         .delete(refreshTokens)
