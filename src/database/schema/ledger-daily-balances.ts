@@ -1,10 +1,4 @@
-import {
-  date,
-  numeric,
-  pgTable,
-  primaryKey,
-  uuid,
-} from 'drizzle-orm/pg-core';
+import { date, numeric, pgTable, primaryKey, uuid } from 'drizzle-orm/pg-core';
 import { tenantIsolation } from '../tenant-table';
 import { tenants } from './tenants';
 import { traders } from './traders';
