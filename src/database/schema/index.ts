@@ -3,6 +3,7 @@ export * from './auth-logs';
 export * from './commodities';
 export * from './daily-rates';
 export * from './invitations';
+export * from './ledger-daily-balances';
 export * from './ledger-entries';
 export * from './number-sequences';
 export * from './otp-codes';
