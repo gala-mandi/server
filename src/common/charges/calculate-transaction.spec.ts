@@ -1,4 +1,6 @@
 import Decimal from 'decimal.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   effectiveCharges,
   standardCharges,
@@ -7,9 +9,22 @@ import { InvalidQuantityError } from '../units/units';
 import {
   calculateTransaction,
   type RateUnit,
+  type TransactionBreakdown,
   type TransactionInput,
 } from './calculate-transaction';
-import { TRANSACTION_FIXTURES } from './calculate-transaction.fixtures';
+
+/**
+ * Contract fixtures: the web repo keeps a byte-identical copy of this JSON
+ * file and runs it against its twin of the calculator, so both sides must
+ * give these exact strings.
+ */
+const TRANSACTION_FIXTURES = JSON.parse(
+  readFileSync(join(__dirname, 'calculate-transaction.fixtures.json'), 'utf8'),
+) as {
+  name: string;
+  input: TransactionInput;
+  expected: TransactionBreakdown;
+}[];
 
 const base: TransactionInput = {
   kind: 'purchase',
