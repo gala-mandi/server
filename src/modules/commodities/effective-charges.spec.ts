@@ -1,6 +1,7 @@
 import {
   effectiveCharges,
   SHOP_CHARGE_DEFAULTS,
+  standardCharges,
   type ShopCharges,
 } from './effective-charges';
 
@@ -60,5 +61,66 @@ describe('effectiveCharges()', () => {
       marketFeePct: '0.00',
       labourPerBag: '0.00',
     });
+  });
+
+  describe('manual override on the entry', () => {
+    const commodity = {
+      commissionPct: '3.00',
+      marketFeePct: null,
+      labourPerBag: '35.00',
+    };
+
+    it('each source wins in turn: manual → commodity → shop', () => {
+      expect(
+        effectiveCharges(commodity, shop, { labourPerBag: '15.00' }),
+      ).toEqual({
+        commissionPct: '3.00', // commodity
+        marketFeePct: '1.00', // shop
+        labourPerBag: '15.00', // manual
+      });
+    });
+
+    it('manual beats both the commodity and the shop default', () => {
+      expect(
+        effectiveCharges(commodity, shop, {
+          commissionPct: '1.50',
+          marketFeePct: '0.25',
+          labourPerBag: '10.00',
+        }),
+      ).toEqual({
+        commissionPct: '1.50',
+        marketFeePct: '0.25',
+        labourPerBag: '10.00',
+      });
+    });
+
+    it('manual "0.00" waives the charge; null or missing falls back', () => {
+      expect(
+        effectiveCharges(commodity, shop, {
+          commissionPct: '0.00',
+          marketFeePct: null,
+        }),
+      ).toEqual({
+        commissionPct: '0.00',
+        marketFeePct: '1.00',
+        labourPerBag: '35.00',
+      });
+    });
+  });
+});
+
+describe('standardCharges()', () => {
+  it('commission and market fee are percent, labour is per bag', () => {
+    expect(
+      standardCharges({
+        commissionPct: '2.00',
+        marketFeePct: '0.50',
+        labourPerBag: '20.00',
+      }),
+    ).toEqual([
+      { type: 'commission', basis: 'percent', value: '2.00' },
+      { type: 'market_fee', basis: 'percent', value: '0.50' },
+      { type: 'labour', basis: 'per_bag', value: '20.00' },
+    ]);
   });
 });
