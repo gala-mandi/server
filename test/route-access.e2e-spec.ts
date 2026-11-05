@@ -144,6 +144,20 @@ describe('Route access metadata (e2e)', () => {
     });
   });
 
+  it('the rate routes need their own permission', () => {
+    const rates = Object.fromEntries(
+      handlers
+        .filter((h) => h.name.startsWith('RatesController.'))
+        .map((h) => [h.name.split('.')[1], h.permissions]),
+    );
+
+    expect(rates).toEqual({
+      today: ['rate.view'],
+      list: ['rate.view'],
+      save: ['rate.manage'],
+    });
+  });
+
   it('only the expected routes are public', () => {
     const open = handlers
       .filter((h) => h.access === 'public')

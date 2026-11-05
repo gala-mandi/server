@@ -1,5 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import type { commodities } from '../../database/schema';
+import { type commodities, dailyRates } from '../../database/schema';
 import type {
   TenantDatabase,
   TenantScope,
@@ -68,6 +68,8 @@ function fakeDb() {
       ): Promise<CommodityRow | null> => Promise.resolve(row(values)),
     ),
     softDelete: jest.fn(() => Promise.resolve(true)),
+    // No daily rates point at the commodity.
+    count: jest.fn(() => Promise.resolve(0)),
   };
   const scope = {
     tx: {},
@@ -295,15 +297,31 @@ describe('CommoditiesService', () => {
       expect(table.softDelete).not.toHaveBeenCalled();
     });
 
-    it('nothing references commodities yet: isInUse is false today', async () => {
-      const { service } = fakeDb();
-      const isInUse = (
-        service as unknown as {
-          isInUse: (s: unknown, id: string) => Promise<boolean>;
-        }
-      ).isInUse.bind(service);
+    describe('isInUse()', () => {
+      /** isInUse with a scope whose `count()` returns `rates` daily rates. */
+      function inUse(rates: number) {
+        const { service } = fakeDb();
+        const count = jest.fn(() => Promise.resolve(rates));
+        const scoped = jest.fn(() => ({ count }));
+        const isInUse = (
+          service as unknown as {
+            isInUse: (s: unknown, id: string) => Promise<boolean>;
+          }
+        ).isInUse.bind(service);
+        return { result: isInUse({ scoped }, ID), scoped, count };
+      }
 
-      await expect(isInUse({}, ID)).resolves.toBe(false);
+      it('a commodity with daily rates is in use', async () => {
+        const { result, scoped, count } = inUse(3);
+
+        await expect(result).resolves.toBe(true);
+        expect(scoped).toHaveBeenCalledWith(dailyRates);
+        expect(count).toHaveBeenCalledTimes(1);
+      });
+
+      it('no rates (purchases and sales not built yet) → not in use', async () => {
+        await expect(inUse(0).result).resolves.toBe(false);
+      });
     });
   });
 });
