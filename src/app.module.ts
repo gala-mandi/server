@@ -22,6 +22,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { RatesModule } from './modules/rates/rates.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { StatsModule } from './modules/stats/stats.module';
@@ -83,6 +84,7 @@ import { UsersModule } from './modules/users/users.module';
     PurchasesModule,
     SalesModule,
     PaymentsModule,
+    ReportsModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

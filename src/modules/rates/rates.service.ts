@@ -212,11 +212,11 @@ export class RatesService {
     });
   }
 
-  /** One day's rates, in commodity name order (as the entry grid lists them). */
-  private async ratesOf(
-    { tx, scoped }: TenantScope,
-    date: string,
-  ): Promise<Rate[]> {
+  /**
+   * One day's rates, in commodity name order (as the entry grid lists them),
+   * inside an open transaction (the daily summary report reuses it).
+   */
+  async ratesOf({ tx, scoped }: TenantScope, date: string): Promise<Rate[]> {
     const rows = await tx
       .select(getTableColumns(dailyRates))
       .from(dailyRates)

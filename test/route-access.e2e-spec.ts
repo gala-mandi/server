@@ -209,6 +209,23 @@ describe('Route access metadata (e2e)', () => {
     });
   });
 
+  it('every report needs report.view (owner and manager only)', () => {
+    const reports = Object.fromEntries(
+      handlers
+        .filter((h) => h.name.startsWith('ReportsController.'))
+        .map((h) => [h.name.split('.')[1], h.permissions]),
+    );
+
+    expect(reports).toEqual({
+      dailySummary: ['report.view'],
+      purchases: ['report.view'],
+      sales: ['report.view'],
+      commission: ['report.view'],
+      outstanding: ['report.view'],
+      cashBook: ['report.view'],
+    });
+  });
+
   it('only the expected routes are public', () => {
     const open = handlers
       .filter((h) => h.access === 'public')
