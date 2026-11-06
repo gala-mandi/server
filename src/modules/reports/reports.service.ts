@@ -58,7 +58,6 @@ interface Book {
   bills: typeof purchases | typeof sales;
   date: PgColumn;
   trader: PgColumn;
-  gross: PgColumn;
   /** Deductions (purchases) or charges (sales) of the bill. */
   charges: PgColumn;
   net: PgColumn;
@@ -75,7 +74,6 @@ const PURCHASES: Book = {
   bills: purchases,
   date: purchases.purchaseDate,
   trader: purchases.traderId,
-  gross: purchases.grossAmount,
   charges: purchases.totalDeductions,
   net: purchases.netAmount,
   settled: purchases.paidAmount,
@@ -90,7 +88,6 @@ const SALES: Book = {
   bills: sales,
   date: sales.saleDate,
   trader: sales.buyerId,
-  gross: sales.grossAmount,
   charges: sales.totalCharges,
   net: sales.netAmount,
   settled: sales.receivedAmount,
