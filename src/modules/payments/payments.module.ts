@@ -7,5 +7,7 @@ import { PaymentsService } from './payments.service';
   imports: [LedgerModule],
   controllers: [PaymentsController],
   providers: [PaymentsService],
+  // The reports reuse the cash book.
+  exports: [PaymentsService],
 })
 export class PaymentsModule {}
