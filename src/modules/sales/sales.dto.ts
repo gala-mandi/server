@@ -132,6 +132,11 @@ export const saleSummarySchema = z.object({
   netAmount: z.string(),
   /** Received on the same save (credited back in the khata). */
   receivedAmount: z.string(),
+  /**
+   * Still to receive from the beopari on this bill: net − received on save
+   * − receipt vouchers against it; "0.00" when cancelled.
+   */
+  outstanding: z.string(),
   status: z.enum(SALE_STATUSES),
   notes: z.string().nullable(),
   createdAt: z.iso.datetime(),

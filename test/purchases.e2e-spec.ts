@@ -226,6 +226,7 @@ describe('Purchases /purchases (e2e)', () => {
         rounding: '0.00',
         netAmount: '97300.00',
         paidAmount: '0.00',
+        outstanding: '97300.00',
         status: 'posted',
         notes: 'Lot 1',
         items: [
@@ -697,6 +698,7 @@ describe('Purchases /purchases (e2e)', () => {
         rounding: '0.00',
         netAmount: '100000.00',
         paidAmount: '0.00',
+        outstanding: '100000.00',
         status: 'posted',
         notes: null,
         createdAt: expect.any(String),

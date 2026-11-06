@@ -192,6 +192,23 @@ describe('Route access metadata (e2e)', () => {
     });
   });
 
+  it('the payment routes need their own permission', () => {
+    const payments = Object.fromEntries(
+      handlers
+        .filter((h) => h.name.startsWith('PaymentsController.'))
+        .map((h) => [h.name.split('.')[1], h.permissions]),
+    );
+
+    expect(payments).toEqual({
+      create: ['payment.create'],
+      list: ['payment.view'],
+      cashBook: ['payment.view'],
+      get: ['payment.view'],
+      // Cancel is how a payment is "deleted".
+      cancel: ['payment.delete'],
+    });
+  });
+
   it('only the expected routes are public', () => {
     const open = handlers
       .filter((h) => h.access === 'public')

@@ -53,6 +53,12 @@ import { InvalidEntryError } from '../ledger/ledger-math';
 import { LedgerReconciliation } from '../ledger/ledger-reconciliation.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { nextNumber } from '../numbering/next-number';
+import {
+  allocatedSql,
+  allocationsOfBill,
+  billHasPayments,
+} from '../payments/bill-allocations';
+import { outstandingOf } from '../payments/payment-allocation';
 import { type Actor, isUniqueViolation } from '../purchases/purchases.service';
 import { likePattern, traderSearch } from '../traders/trader-search';
 import { postSale, repostSale, reverseSale } from './sale-ledger';
@@ -113,9 +119,13 @@ export function roundingOf(
     .toFixed(2);
 }
 
+/**
+ * @param allocated rupees of live receipt vouchers against the bill
+ */
 export function toSummary(
   row: SaleRow,
   buyer: { id: string; name: string },
+  allocated = '0',
 ): SaleSummary {
   return {
     id: row.id,
@@ -127,6 +137,12 @@ export function toSummary(
     rounding: roundingOf(row),
     netAmount: row.netAmount,
     receivedAmount: row.receivedAmount,
+    outstanding: outstandingOf({
+      status: row.status,
+      netAmount: row.netAmount,
+      settledOnSave: row.receivedAmount,
+      allocated,
+    }),
     status: row.status,
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),
@@ -284,6 +300,7 @@ export class SalesService implements OnModuleInit {
           .select({
             sale: sales,
             buyer: { id: traders.id, name: traders.name },
+            allocated: allocatedSql('sale', sales.id, sales.tenantId),
           })
           .from(sales)
           .innerJoin(traders, join)
@@ -298,7 +315,7 @@ export class SalesService implements OnModuleInit {
           .where(where),
       ]);
       return {
-        data: rows.map((r) => toSummary(r.sale, r.buyer)),
+        data: rows.map((r) => toSummary(r.sale, r.buyer, r.allocated)),
         meta: { page: query.page, limit: query.limit, total },
       };
     });
@@ -336,8 +353,12 @@ export class SalesService implements OnModuleInit {
       }
       this.checkDate(date, today);
 
+      // Receipt vouchers against the bill pin its beopari and its lowest net.
+      const vouchers = await allocationsOfBill(scope, 'sale', id);
+      const settled = new Decimal(vouchers.total).gt(0);
       const errors: FieldError[] = [];
       if (input.buyerId && input.buyerId !== before.buyerId) {
+        if (settled) throw billHasPayments(vouchers, 'move to another beopari');
         errors.push(...(await this.checkBuyer(scope, input.buyerId)).errors);
       }
 
@@ -371,6 +392,13 @@ export class SalesService implements OnModuleInit {
       const netAmount = calculated?.totals.netAmount ?? before.netAmount;
       const receivedAmount = input.receivedAmount ?? before.receivedAmount;
       this.checkReceived(receivedAmount, netAmount);
+      const lowest = new Decimal(receivedAmount).plus(vouchers.total);
+      if (settled && lowest.gt(netAmount)) {
+        throw billHasPayments(
+          vouchers,
+          `have a net below Rs ${lowest.toFixed(2)} (received on save plus vouchers)`,
+        );
+      }
 
       const changes = Object.fromEntries(
         Object.entries({
@@ -432,6 +460,10 @@ export class SalesService implements OnModuleInit {
     return this.db.transaction(async (scope) => {
       const before = await this.lock(scope, id);
       if (before.status === 'cancelled') throw cancelled();
+      const vouchers = await allocationsOfBill(scope, 'sale', id);
+      if (new Decimal(vouchers.total).gt(0)) {
+        throw billHasPayments(vouchers, 'be cancelled');
+      }
       const after =
         (await scope
           .scoped(sales)
@@ -836,8 +868,9 @@ export class SalesService implements OnModuleInit {
         .where(eq(commodities.tenantId, tenantId)),
     ]);
     const nameOf = new Map(names.map((n) => [n.id, n.name]));
+    const vouchers = await allocationsOfBill(scope, 'sale', row.id);
     return {
-      ...toSummary(row, buyer),
+      ...toSummary(row, buyer, vouchers.total),
       items: items.map((item) => toItem(item, nameOf.get(item.commodityId))),
       charges: charges.map(toCharge),
       createdBy: row.createdBy,

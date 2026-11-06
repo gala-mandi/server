@@ -1006,14 +1006,15 @@ describe('Ledger /ledger (e2e)', () => {
       const owner = await fx.user('owner', other);
       const otherToken = await login(owner.phone);
       const t = await trader({}, otherToken);
-      const receiptId = randomUUID();
-      // A receipt entry: no receipts are registered yet (payments ticket).
+      const strayId = randomUUID();
+      // Every document type is registered now: a reversal of a document
+      // that never was is what no document explains.
       await fx.db.insert(ledgerEntries).values({
         tenantId: other,
         traderId: t.id,
         entryDate: '2026-10-02',
-        sourceType: 'receipt',
-        sourceId: receiptId,
+        sourceType: 'reversal',
+        sourceId: strayId,
         credit: '300.00',
       });
       // A snapshot changed by hand.
@@ -1033,8 +1034,8 @@ describe('Ledger /ledger (e2e)', () => {
             expect.objectContaining({
               check: 'unexplained',
               traderId: t.id,
-              sourceType: 'receipt',
-              sourceId: receiptId,
+              sourceType: 'reversal',
+              sourceId: strayId,
               actual: '-300.00',
             }),
             expect.objectContaining({

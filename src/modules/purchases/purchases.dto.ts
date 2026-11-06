@@ -174,6 +174,11 @@ export const purchaseSummarySchema = z.object({
   netAmount: z.string(),
   /** Paid on the same save (debited back in the khata). */
   paidAmount: z.string(),
+  /**
+   * Still to pay the kissan on this bill: net − paid on save − payment
+   * vouchers against it; "0.00" when cancelled.
+   */
+  outstanding: z.string(),
   status: z.enum(PURCHASE_STATUSES),
   notes: z.string().nullable(),
   createdAt: z.iso.datetime(),
