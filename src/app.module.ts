@@ -19,6 +19,7 @@ import { CommoditiesModule } from './modules/commodities/commodities.module';
 import { HealthModule } from './modules/health/health.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
+import { SalesModule } from './modules/sales/sales.module';
 import { RatesModule } from './modules/rates/rates.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { StaffModule } from './modules/staff/staff.module';
@@ -79,6 +80,7 @@ import { UsersModule } from './modules/users/users.module';
     LedgerModule,
     StatsModule,
     PurchasesModule,
+    SalesModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

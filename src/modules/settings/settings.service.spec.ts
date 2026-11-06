@@ -40,6 +40,7 @@ function settingsRow(over: Partial<SettingsRow> = {}): SettingsRow {
     billPrefix: null,
     financialYearStart: null,
     language: 'en',
+    creditLimitAction: 'warn',
     updatedAt: EARLIER,
     ...over,
   };
@@ -64,6 +65,7 @@ describe('toSettings()', () => {
       billPrefix: null,
       financialYearStart: null,
       language: 'en',
+      creditLimitAction: 'warn',
       updatedAt: EARLIER.toISOString(),
     });
   });

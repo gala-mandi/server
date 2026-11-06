@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 export const UNITS = ['kg', 'maund', 'bag'] as const;
 export const LANGUAGES = ['en', 'ur'] as const;
+/** What a sale does when the buyer goes over their credit limit. */
+export const CREDIT_LIMIT_ACTIONS = ['warn', 'block'] as const;
 
 const optionalText = (max: number) =>
   z
@@ -65,6 +67,8 @@ export const updateSettingsSchema = z
       .regex(/^\d{1,3}(\.\d{1,3})?$/, 'Enter kg per maund (up to 3 decimals)')
       .refine((v) => /[1-9]/.test(v), 'Kg per maund must be more than 0'),
     language: z.enum(LANGUAGES, 'Choose English or Urdu'),
+    // Sales
+    creditLimitAction: z.enum(CREDIT_LIMIT_ACTIONS, 'Choose warn or block'),
     // Numbering
     billPrefix: z
       .string()
@@ -105,6 +109,8 @@ export const settingsSchema = z.object({
   /** YYYY-MM-DD */
   financialYearStart: z.string().nullable(),
   language: z.enum(LANGUAGES),
+  /** warn: the sale is saved with a warning; block: the sale is refused. */
+  creditLimitAction: z.enum(CREDIT_LIMIT_ACTIONS),
   updatedAt: z.iso.datetime(),
 });
 

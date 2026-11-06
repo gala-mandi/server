@@ -19,6 +19,7 @@ import {
   commodities,
   dailyRates,
   purchaseItems,
+  saleItems,
   tenantSettings,
 } from '../../database/schema';
 import {
@@ -233,10 +234,7 @@ export class CommoditiesService implements OnModuleInit {
     });
   }
 
-  /**
-   * One check per table that points at commodities. `sale_items` doesn't
-   * exist yet: the sales ticket adds its check here.
-   */
+  /** One check per table that points at commodities. */
   private readonly usageChecks: ((
     scope: TenantScope,
     commodityId: string,
@@ -250,6 +248,10 @@ export class CommoditiesService implements OnModuleInit {
       (await scoped(purchaseItems).count(
         eq(purchaseItems.commodityId, commodityId),
       )) > 0,
+    // Items of cancelled sales count too.
+    async ({ scoped }, commodityId) =>
+      (await scoped(saleItems).count(eq(saleItems.commodityId, commodityId))) >
+      0,
   ];
 
   /** Whether any rate, purchase or sale uses this commodity. */

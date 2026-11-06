@@ -236,6 +236,14 @@ describe('updateSettingsSchema', () => {
       ]);
     });
 
+    it('creditLimitAction is warn or block', () => {
+      expect(parse({ creditLimitAction: 'block' }).success).toBe(true);
+      expect(parse({ creditLimitAction: 'warn' }).success).toBe(true);
+      expect(messagesOf({ creditLimitAction: 'ignore' })).toEqual([
+        'Choose warn or block',
+      ]);
+    });
+
     it('financialYearStart must be YYYY-MM-DD', () => {
       expect(parse({ financialYearStart: '2026-07-01' }).success).toBe(true);
       expect(messagesOf({ financialYearStart: '01/07/2026' })).toEqual([
@@ -287,6 +295,7 @@ describe('settingsSchema', () => {
     billPrefix: null,
     financialYearStart: null,
     language: 'en',
+    creditLimitAction: 'warn',
     updatedAt: '2026-10-01T00:00:00.000Z',
   };
 
