@@ -344,34 +344,44 @@ export class PaymentsService implements OnModuleInit {
         { field: 'to', message: `Choose at most ${MAX_CASH_BOOK_DAYS} days` },
       ]);
     }
-    return this.db.transaction(async ({ tx, scoped }) => {
-      const cash = scoped(payments).where(
-        and(eq(payments.method, 'cash'), eq(payments.status, 'posted')),
-      );
-      const cashIn = sql<string>`coalesce(sum(${payments.amount}) filter (where ${payments.direction} = 'received'), 0)::numeric(14,2)::text`;
-      const cashOut = sql<string>`coalesce(sum(${payments.amount}) filter (where ${payments.direction} = 'paid'), 0)::numeric(14,2)::text`;
+    return this.db.transaction((scope) => this.cashBookOf(scope, from, to));
+  }
 
-      const [opening] = await tx
-        .select({ cashIn, cashOut })
-        .from(payments)
-        .where(and(cash, lt(payments.paymentDate, from)));
-      const days = await tx
-        .select({ date: payments.paymentDate, cashIn, cashOut })
-        .from(payments)
-        .where(
-          and(
-            cash,
-            gte(payments.paymentDate, from),
-            lte(payments.paymentDate, to),
-          ),
-        )
-        .groupBy(payments.paymentDate)
-        .orderBy(asc(payments.paymentDate));
-      const openingCash = new Decimal(opening.cashIn)
-        .minus(opening.cashOut)
-        .toFixed(2);
-      return cashBook(from, to, openingCash, days);
-    });
+  /**
+   * The cash book of a checked range inside an open transaction (the
+   * reports reuse it). See `cashBook()`.
+   */
+  async cashBookOf(
+    { tx, scoped }: TenantScope,
+    from: string,
+    to: string,
+  ): Promise<CashBook> {
+    const cash = scoped(payments).where(
+      and(eq(payments.method, 'cash'), eq(payments.status, 'posted')),
+    );
+    const cashIn = sql<string>`coalesce(sum(${payments.amount}) filter (where ${payments.direction} = 'received'), 0)::numeric(14,2)::text`;
+    const cashOut = sql<string>`coalesce(sum(${payments.amount}) filter (where ${payments.direction} = 'paid'), 0)::numeric(14,2)::text`;
+
+    const [opening] = await tx
+      .select({ cashIn, cashOut })
+      .from(payments)
+      .where(and(cash, lt(payments.paymentDate, from)));
+    const days = await tx
+      .select({ date: payments.paymentDate, cashIn, cashOut })
+      .from(payments)
+      .where(
+        and(
+          cash,
+          gte(payments.paymentDate, from),
+          lte(payments.paymentDate, to),
+        ),
+      )
+      .groupBy(payments.paymentDate)
+      .orderBy(asc(payments.paymentDate));
+    const openingCash = new Decimal(opening.cashIn)
+      .minus(opening.cashOut)
+      .toFixed(2);
+    return cashBook(from, to, openingCash, days);
   }
 
   /* ---------------------------------------------------------------- */
