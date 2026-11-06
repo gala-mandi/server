@@ -244,6 +244,14 @@ describe('updateSettingsSchema', () => {
       ]);
     });
 
+    it('overpaymentAction is advance or block', () => {
+      expect(parse({ overpaymentAction: 'block' }).success).toBe(true);
+      expect(parse({ overpaymentAction: 'advance' }).success).toBe(true);
+      expect(messagesOf({ overpaymentAction: 'warn' })).toEqual([
+        'Choose advance or block',
+      ]);
+    });
+
     it('financialYearStart must be YYYY-MM-DD', () => {
       expect(parse({ financialYearStart: '2026-07-01' }).success).toBe(true);
       expect(messagesOf({ financialYearStart: '01/07/2026' })).toEqual([
@@ -296,6 +304,7 @@ describe('settingsSchema', () => {
     financialYearStart: null,
     language: 'en',
     creditLimitAction: 'warn',
+    overpaymentAction: 'advance',
     updatedAt: '2026-10-01T00:00:00.000Z',
   };
 

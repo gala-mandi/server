@@ -47,6 +47,12 @@ export const tenantSettings = pgTable(
     creditLimitAction: varchar('credit_limit_action', { length: 10 })
       .notNull()
       .default('warn'),
+    // What a payment or receipt does when it is more than the trader is
+    // owed (or owes) in the khata: advance (saved, the rest is a peshgi) |
+    // block
+    overpaymentAction: varchar('overpayment_action', { length: 10 })
+      .notNull()
+      .default('advance'),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()

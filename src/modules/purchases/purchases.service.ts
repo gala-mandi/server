@@ -52,6 +52,12 @@ import { InvalidEntryError } from '../ledger/ledger-math';
 import { LedgerReconciliation } from '../ledger/ledger-reconciliation.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { nextNumber } from '../numbering/next-number';
+import {
+  allocatedSql,
+  allocationsOfBill,
+  billHasPayments,
+} from '../payments/bill-allocations';
+import { outstandingOf } from '../payments/payment-allocation';
 import { likePattern, traderSearch } from '../traders/trader-search';
 import {
   postPurchase,
@@ -121,9 +127,13 @@ export function roundingOf(
     .toFixed(2);
 }
 
+/**
+ * @param allocated rupees of live payment vouchers against the bill
+ */
 export function toSummary(
   row: PurchaseRow,
   trader: { id: string; name: string },
+  allocated = '0',
 ): PurchaseSummary {
   return {
     id: row.id,
@@ -135,6 +145,12 @@ export function toSummary(
     rounding: roundingOf(row),
     netAmount: row.netAmount,
     paidAmount: row.paidAmount,
+    outstanding: outstandingOf({
+      status: row.status,
+      netAmount: row.netAmount,
+      settledOnSave: row.paidAmount,
+      allocated,
+    }),
     status: row.status,
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),
@@ -283,6 +299,11 @@ export class PurchasesService implements OnModuleInit {
           .select({
             purchase: purchases,
             trader: { id: traders.id, name: traders.name },
+            allocated: allocatedSql(
+              'purchase',
+              purchases.id,
+              purchases.tenantId,
+            ),
           })
           .from(purchases)
           .innerJoin(traders, join)
@@ -297,7 +318,7 @@ export class PurchasesService implements OnModuleInit {
           .where(where),
       ]);
       return {
-        data: rows.map((r) => toSummary(r.purchase, r.trader)),
+        data: rows.map((r) => toSummary(r.purchase, r.trader, r.allocated)),
         meta: { page: query.page, limit: query.limit, total },
       };
     });
@@ -336,8 +357,12 @@ export class PurchasesService implements OnModuleInit {
       }
       this.checkDate(date, today);
 
+      // Payment vouchers against the bill pin its kissan and its lowest net.
+      const vouchers = await allocationsOfBill(scope, 'purchase', id);
+      const settled = new Decimal(vouchers.total).gt(0);
       const errors: FieldError[] = [];
       if (input.traderId && input.traderId !== before.traderId) {
+        if (settled) throw billHasPayments(vouchers, 'move to another kissan');
         errors.push(...(await this.checkTrader(scope, input.traderId)));
       }
 
@@ -364,6 +389,13 @@ export class PurchasesService implements OnModuleInit {
       const netAmount = calculated?.totals.netAmount ?? before.netAmount;
       const paidAmount = input.paidAmount ?? before.paidAmount;
       this.checkPaid(paidAmount, netAmount);
+      const lowest = new Decimal(paidAmount).plus(vouchers.total);
+      if (settled && lowest.gt(netAmount)) {
+        throw billHasPayments(
+          vouchers,
+          `have a net below Rs ${lowest.toFixed(2)} (paid on save plus vouchers)`,
+        );
+      }
 
       const changes = Object.fromEntries(
         Object.entries({
@@ -414,6 +446,10 @@ export class PurchasesService implements OnModuleInit {
     return this.db.transaction(async (scope) => {
       const before = await this.lock(scope, id);
       if (before.status === 'cancelled') throw cancelled();
+      const vouchers = await allocationsOfBill(scope, 'purchase', id);
+      if (new Decimal(vouchers.total).gt(0)) {
+        throw billHasPayments(vouchers, 'be cancelled');
+      }
       const after =
         (await scope
           .scoped(purchases)
@@ -704,8 +740,9 @@ export class PurchasesService implements OnModuleInit {
         .where(eq(commodities.tenantId, tenantId)),
     ]);
     const nameOf = new Map(names.map((n) => [n.id, n.name]));
+    const vouchers = await allocationsOfBill(scope, 'purchase', row.id);
     return {
-      ...toSummary(row, trader),
+      ...toSummary(row, trader, vouchers.total),
       items: items.map((item) => toItem(item, nameOf.get(item.commodityId))),
       charges: charges.map(toCharge),
       createdBy: row.createdBy,

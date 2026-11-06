@@ -7,6 +7,7 @@ export * from './ledger-daily-balances';
 export * from './ledger-entries';
 export * from './number-sequences';
 export * from './otp-codes';
+export * from './payments';
 export * from './purchases';
 export * from './refresh-tokens';
 export * from './sales';

@@ -5,6 +5,8 @@ export const UNITS = ['kg', 'maund', 'bag'] as const;
 export const LANGUAGES = ['en', 'ur'] as const;
 /** What a sale does when the buyer goes over their credit limit. */
 export const CREDIT_LIMIT_ACTIONS = ['warn', 'block'] as const;
+/** What a payment does when it is more than the khata owes. */
+export const OVERPAYMENT_ACTIONS = ['advance', 'block'] as const;
 
 const optionalText = (max: number) =>
   z
@@ -69,6 +71,8 @@ export const updateSettingsSchema = z
     language: z.enum(LANGUAGES, 'Choose English or Urdu'),
     // Sales
     creditLimitAction: z.enum(CREDIT_LIMIT_ACTIONS, 'Choose warn or block'),
+    // Payments
+    overpaymentAction: z.enum(OVERPAYMENT_ACTIONS, 'Choose advance or block'),
     // Numbering
     billPrefix: z
       .string()
@@ -111,6 +115,11 @@ export const settingsSchema = z.object({
   language: z.enum(LANGUAGES),
   /** warn: the sale is saved with a warning; block: the sale is refused. */
   creditLimitAction: z.enum(CREDIT_LIMIT_ACTIONS),
+  /**
+   * A payment or receipt above what the khata owes: advance (saved, the rest
+   * is a peshgi) or block (refused).
+   */
+  overpaymentAction: z.enum(OVERPAYMENT_ACTIONS),
   updatedAt: z.iso.datetime(),
 });
 

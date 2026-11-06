@@ -262,6 +262,7 @@ describe('Sales /sales (e2e)', () => {
         rounding: '0.00',
         netAmount: '102700.00',
         receivedAmount: '0.00',
+        outstanding: '102700.00',
         status: 'posted',
         notes: 'Truck 1',
         items: [
@@ -1029,6 +1030,7 @@ describe('Sales /sales (e2e)', () => {
         rounding: '0.00',
         netAmount: '100000.00',
         receivedAmount: '0.00',
+        outstanding: '100000.00',
         status: 'posted',
         notes: null,
         createdAt: expect.any(String),

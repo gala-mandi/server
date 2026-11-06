@@ -69,6 +69,7 @@ describe('toSummary()', () => {
       rounding: '-0.46',
       netAmount: '97332.00',
       paidAmount: '0.00',
+      outstanding: '97332.00',
       status: 'posted',
       notes: null,
       createdAt: '2026-11-06T05:00:00.000Z',
@@ -77,6 +78,16 @@ describe('toSummary()', () => {
     expect(summary).not.toHaveProperty('tenantId');
     expect(summary).not.toHaveProperty('idempotencyKey');
     expect(purchaseSummarySchema.safeParse(summary).success).toBe(true);
+  });
+
+  it('outstanding: net − paid on save − vouchers; 0 when cancelled', () => {
+    const trader = { id: KISSAN, name: 'Muhammad Ali' };
+    const paid = row({ netAmount: '100000.00', paidAmount: '10000.00' });
+
+    expect(toSummary(paid, trader, '40000.00').outstanding).toBe('50000.00');
+    expect(
+      toSummary({ ...paid, status: 'cancelled' }, trader, '0').outstanding,
+    ).toBe('0.00');
   });
 });
 
