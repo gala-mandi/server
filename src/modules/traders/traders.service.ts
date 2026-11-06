@@ -10,10 +10,8 @@ import {
   count,
   desc,
   eq,
-  ilike,
   inArray,
   not,
-  or,
   type SQL,
   sql,
 } from 'drizzle-orm';
@@ -23,6 +21,8 @@ import {
   type TenantScope,
 } from '../../database/tenant-database';
 import { RestorableRegistry } from '../audit/restorable-registry';
+import { LedgerReconciliation } from '../ledger/ledger-reconciliation.service';
+import { LedgerService } from '../ledger/ledger.service';
 import { isPhoneUniqueViolation } from '../staff/phone-account';
 import type {
   CreateTraderInput,
@@ -33,6 +33,9 @@ import type {
   TraderLookupItem,
   UpdateTraderInput,
 } from './traders.dto';
+import { likePattern, traderSearch } from './trader-search';
+
+export { likePattern } from './trader-search';
 
 type TraderRow = typeof traders.$inferSelect;
 type BalanceType = 'debit' | 'credit';
@@ -55,11 +58,6 @@ export function toTrader(row: TraderRow): Trader {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
-}
-
-/** `%`, `_` and `\` typed by the user match themselves, not any text. */
-export function likePattern(text: string): string {
-  return `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 }
 
 /** True when the amount string is more than zero ("0", "0.00" are not). */
@@ -85,10 +83,24 @@ export class TradersService implements OnModuleInit {
   constructor(
     private readonly db: TenantDatabase,
     private readonly restorable: RestorableRegistry,
+    private readonly ledger: LedgerService,
+    private readonly reconciliation: LedgerReconciliation,
   ) {}
 
   onModuleInit(): void {
     this.restorable.register('traders', traders);
+    // The khata must hold each trader's current opening balance (soft-deleted
+    // traders included: their entries stay).
+    this.reconciliation.register({
+      sourceType: 'opening',
+      expected: sql`
+        select ${traders.tenantId} as tenant_id, ${traders.id} as trader_id,
+               ${traders.id} as source_id,
+               case when ${traders.openingBalanceType} = 'credit'
+                    then -${traders.openingBalance}
+                    else ${traders.openingBalance} end as net
+          from ${traders}`,
+    });
   }
 
   async list(query: ListTradersQuery) {
@@ -98,7 +110,7 @@ export class TradersService implements OnModuleInit {
       if (query.active !== undefined) {
         filters.push(eq(traders.isActive, query.active));
       }
-      if (query.search) filters.push(this.searchFilter(query.search));
+      if (query.search) filters.push(traderSearch(query.search));
       const where = scoped(traders).where(and(...filters));
 
       const order = {
@@ -130,7 +142,7 @@ export class TradersService implements OnModuleInit {
     return this.db.transaction(async ({ tx, scoped }) => {
       const filters: SQL[] = [eq(traders.isActive, true)];
       if (query.type) filters.push(eq(traders.type, query.type));
-      if (query.q) filters.push(this.searchFilter(query.q));
+      if (query.q) filters.push(traderSearch(query.q));
       // Names starting with q first. Without q there is nothing to rank
       // (a constant would be `order by 0`, which Postgres rejects).
       const startsWith = query.q
@@ -228,23 +240,8 @@ export class TradersService implements OnModuleInit {
     });
   }
 
-  private searchFilter(text: string): SQL {
-    const name = ilike(traders.name, likePattern(text));
-    const digits = text.replace(/\D/g, '');
-    // Phones are stored as digits; "0300-123" finds 0300123….
-    return digits.length >= 3
-      ? or(name, ilike(traders.phone, likePattern(digits)))!
-      : name;
-  }
-
-  private async balance({ tx }: TenantScope, traderId: string) {
-    const [row] = await tx
-      .select({
-        balance: sql<string>`coalesce(sum(${ledgerEntries.debit}) - sum(${ledgerEntries.credit}), 0)::numeric(14,2)::text`,
-      })
-      .from(ledgerEntries)
-      .where(eq(ledgerEntries.traderId, traderId));
-    return row?.balance ?? '0.00';
+  private balance(scope: TenantScope, traderId: string) {
+    return this.ledger.balance(scope, traderId);
   }
 
   /** Opening and its corrections are not transactions; anything else is. */
@@ -273,9 +270,10 @@ export class TradersService implements OnModuleInit {
   ) {
     if (!isPositive(trader.openingBalance)) return;
     const debit = trader.openingBalanceType === 'debit';
-    await this.addEntry(scope, {
+    await this.ledger.post(scope, {
       traderId: trader.id,
       sourceType: 'opening',
+      sourceId: trader.id,
       debit: debit ? trader.openingBalance : '0',
       credit: debit ? '0' : trader.openingBalance,
       narration: 'Opening balance',
@@ -283,55 +281,17 @@ export class TradersService implements OnModuleInit {
     });
   }
 
+  /** Cancels the current opening balance (whatever is left of it). */
   private async reverseOpening(
     scope: TenantScope,
     before: TraderRow,
     userId: string,
   ) {
-    if (!isPositive(before.openingBalance)) return;
-    const debit = before.openingBalanceType === 'debit';
-    await this.addEntry(scope, {
-      traderId: before.id,
-      sourceType: 'reversal',
-      debit: debit ? '0' : before.openingBalance,
-      credit: debit ? before.openingBalance : '0',
+    await this.ledger.reverse(scope, {
+      sourceType: 'opening',
+      sourceId: before.id,
       narration: 'Opening balance corrected',
       userId,
-    });
-  }
-
-  private async addEntry(
-    { tx, tenantId, audit }: TenantScope,
-    entry: {
-      traderId: string;
-      sourceType: 'opening' | 'reversal';
-      debit: string;
-      credit: string;
-      narration: string;
-      userId: string;
-    },
-  ) {
-    const [row] = await tx
-      .insert(ledgerEntries)
-      .values({
-        tenantId,
-        traderId: entry.traderId,
-        entryDate: sql`(now() at time zone 'Asia/Karachi')::date`,
-        sourceType: entry.sourceType,
-        sourceId: entry.traderId,
-        debit: entry.debit,
-        credit: entry.credit,
-        narration: entry.narration,
-        createdBy: entry.userId,
-      })
-      .returning();
-    // audit_logs.entity_id is a uuid and ledger ids are bigserial: log the
-    // entry under its trader (the row, with its id, is in `after`).
-    await audit({
-      entity: 'ledger_entries',
-      entityId: entry.traderId,
-      action: 'create',
-      after: row,
     });
   }
 }

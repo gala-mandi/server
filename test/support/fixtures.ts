@@ -11,6 +11,7 @@ import {
   commodities,
   dailyRates,
   invitations,
+  ledgerDailyBalances,
   ledgerEntries,
   numberSequences,
   otpCodes,
@@ -132,6 +133,9 @@ export class Fixtures {
       await this.db
         .delete(ledgerEntries)
         .where(inArray(ledgerEntries.tenantId, tIds));
+      await this.db
+        .delete(ledgerDailyBalances)
+        .where(inArray(ledgerDailyBalances.tenantId, tIds));
       await this.db.delete(traders).where(inArray(traders.tenantId, tIds));
       await this.db
         .delete(dailyRates)
