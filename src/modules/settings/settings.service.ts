@@ -48,6 +48,7 @@ export function toSettings(tenant: TenantRow, row: SettingsRow): Settings {
     financialYearStart: row.financialYearStart,
     language: row.language as Settings['language'],
     creditLimitAction: row.creditLimitAction as Settings['creditLimitAction'],
+    overpaymentAction: row.overpaymentAction as Settings['overpaymentAction'],
     updatedAt: updatedAt.toISOString(),
   };
 }

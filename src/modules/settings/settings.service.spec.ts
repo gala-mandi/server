@@ -41,6 +41,7 @@ function settingsRow(over: Partial<SettingsRow> = {}): SettingsRow {
     financialYearStart: null,
     language: 'en',
     creditLimitAction: 'warn',
+    overpaymentAction: 'advance',
     updatedAt: EARLIER,
     ...over,
   };
@@ -66,6 +67,7 @@ describe('toSettings()', () => {
       financialYearStart: null,
       language: 'en',
       creditLimitAction: 'warn',
+      overpaymentAction: 'advance',
       updatedAt: EARLIER.toISOString(),
     });
   });

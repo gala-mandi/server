@@ -178,6 +178,7 @@ describe('Shop settings /settings (e2e)', () => {
         financialYearStart: null,
         language: 'en',
         creditLimitAction: 'warn',
+        overpaymentAction: 'advance',
         updatedAt: expect.stringMatching(ISO),
       });
       const rows = await settingsRows(tenantId);
@@ -362,6 +363,20 @@ describe('Shop settings /settings (e2e)', () => {
       const audit = await auditOf(tenantId);
       expect(audit[0].before).toEqual({ creditLimitAction: 'warn' });
       expect(audit[0].after).toEqual({ creditLimitAction: 'block' });
+    });
+
+    it('the overpayment action (advance | block) is a setting, audited', async () => {
+      const { tenantId, token } = await newShop();
+
+      const res = await patch(token, { overpaymentAction: 'block' }).expect(
+        200,
+      );
+      expect(res.body.overpaymentAction).toBe('block');
+      await patch(token, { overpaymentAction: 'warn' }).expect(400);
+
+      const audit = await auditOf(tenantId);
+      expect(audit[0].before).toEqual({ overpaymentAction: 'advance' });
+      expect(audit[0].after).toEqual({ overpaymentAction: 'block' });
     });
 
     it('nothing changed → no audit row', async () => {

@@ -18,6 +18,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CommoditiesModule } from './modules/commodities/commodities.module';
 import { HealthModule } from './modules/health/health.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { RatesModule } from './modules/rates/rates.module';
@@ -81,6 +82,7 @@ import { UsersModule } from './modules/users/users.module';
     StatsModule,
     PurchasesModule,
     SalesModule,
+    PaymentsModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },
