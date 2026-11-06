@@ -158,6 +158,23 @@ describe('Route access metadata (e2e)', () => {
     });
   });
 
+  it('the purchase routes need their own permission', () => {
+    const purchases = Object.fromEntries(
+      handlers
+        .filter((h) => h.name.startsWith('PurchasesController.'))
+        .map((h) => [h.name.split('.')[1], h.permissions]),
+    );
+
+    expect(purchases).toEqual({
+      create: ['purchase.create'],
+      list: ['purchase.view'],
+      get: ['purchase.view'],
+      update: ['purchase.edit'],
+      // Cancel is how a purchase is "deleted".
+      cancel: ['purchase.delete'],
+    });
+  });
+
   it('only the expected routes are public', () => {
     const open = handlers
       .filter((h) => h.access === 'public')
