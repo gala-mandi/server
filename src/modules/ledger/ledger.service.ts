@@ -9,6 +9,7 @@ import {
   count,
   desc,
   eq,
+  getTableColumns,
   gte,
   inArray,
   lt,
@@ -201,32 +202,34 @@ export class LedgerService {
         query.to ? lte(ledgerEntries.entryDate, query.to) : undefined,
       );
       const offset = (query.page - 1) * query.limit;
-      const khataOrder = [asc(ledgerEntries.entryDate), asc(ledgerEntries.id)];
 
-      const [before, range, [{ total }], earlierOnPage, rows] =
-        await Promise.all([
-          query.from
-            ? this.dailyTotals(tx, and(ofTrader, lt(day.entryDate, query.from)))
-            : ZERO,
-          this.dailyTotals(
-            tx,
-            and(
-              ofTrader,
-              query.from ? gte(day.entryDate, query.from) : undefined,
-              query.to ? lte(day.entryDate, query.to) : undefined,
-            ),
+      const [before, range, [{ total }], rows] = await Promise.all([
+        query.from
+          ? this.dailyTotals(tx, and(ofTrader, lt(day.entryDate, query.from)))
+          : ZERO,
+        this.dailyTotals(
+          tx,
+          and(
+            ofTrader,
+            query.from ? gte(day.entryDate, query.from) : undefined,
+            query.to ? lte(day.entryDate, query.to) : undefined,
           ),
-          tx.select({ total: count() }).from(ledgerEntries).where(inRange),
-          // Entries of the range on earlier pages carry into this page.
-          offset > 0 ? this.firstEntriesTotals(tx, inRange, offset) : ZERO,
-          tx
-            .select()
-            .from(ledgerEntries)
-            .where(inRange)
-            .orderBy(...khataOrder)
-            .limit(query.limit)
-            .offset(offset),
-        ]);
+        ),
+        tx.select({ total: count() }).from(ledgerEntries).where(inRange),
+        tx
+          .select({
+            ...getTableColumns(ledgerEntries),
+            // Debit minus credit of the range's entries before this one:
+            // on the page's first row, what earlier pages carry into it.
+            // One pass over the rows the offset skips anyway.
+            carried: sql<string>`coalesce(sum(${ledgerEntries.debit} - ${ledgerEntries.credit}) over (order by ${ledgerEntries.entryDate}, ${ledgerEntries.id} rows between unbounded preceding and 1 preceding), 0)::text`,
+          })
+          .from(ledgerEntries)
+          .where(inRange)
+          .orderBy(asc(ledgerEntries.entryDate), asc(ledgerEntries.id))
+          .limit(query.limit)
+          .offset(offset),
+      ]);
 
       const openingBalance = balanceOf(before);
       return {
@@ -236,7 +239,7 @@ export class LedgerService {
         openingBalance,
         closingBalance: addBalances(openingBalance, balanceOf(range)),
         data: withRunningBalance(
-          addBalances(openingBalance, balanceOf(earlierOnPage)),
+          addBalances(openingBalance, rows[0]?.carried ?? '0'),
           rows.map(toEntry),
         ),
         meta: { page: query.page, limit: query.limit, total },
@@ -379,28 +382,6 @@ export class LedgerService {
       })
       .from(ledgerDailyBalances)
       .where(where);
-    return row ?? ZERO;
-  }
-
-  /** Totals of the first `n` entries matching `where`, in khata order. */
-  private async firstEntriesTotals(
-    tx: TenantScope['tx'],
-    where: SQL | undefined,
-    n: number,
-  ): Promise<Amounts> {
-    const first = tx
-      .select({ debit: ledgerEntries.debit, credit: ledgerEntries.credit })
-      .from(ledgerEntries)
-      .where(where)
-      .orderBy(asc(ledgerEntries.entryDate), asc(ledgerEntries.id))
-      .limit(n)
-      .as('first');
-    const [row] = await tx
-      .select({
-        debit: sql<string>`coalesce(sum(${first.debit}), 0)::text`,
-        credit: sql<string>`coalesce(sum(${first.credit}), 0)::text`,
-      })
-      .from(first);
     return row ?? ZERO;
   }
 }
