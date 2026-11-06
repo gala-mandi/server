@@ -177,6 +177,7 @@ describe('Shop settings /settings (e2e)', () => {
         billPrefix: null,
         financialYearStart: null,
         language: 'en',
+        creditLimitAction: 'warn',
         updatedAt: expect.stringMatching(ISO),
       });
       const rows = await settingsRows(tenantId);
@@ -347,6 +348,20 @@ describe('Shop settings /settings (e2e)', () => {
       expect(audit.map((a) => a.entity)).toEqual(['tenant_settings']);
       expect(audit[0].before).toEqual({ marketFeePct: '0.00' });
       expect(audit[0].after).toEqual({ marketFeePct: '1.00' });
+    });
+
+    it('the credit limit action (warn | block) is a setting, audited', async () => {
+      const { tenantId, token } = await newShop();
+
+      const res = await patch(token, { creditLimitAction: 'block' }).expect(
+        200,
+      );
+      expect(res.body.creditLimitAction).toBe('block');
+      await patch(token, { creditLimitAction: 'ignore' }).expect(400);
+
+      const audit = await auditOf(tenantId);
+      expect(audit[0].before).toEqual({ creditLimitAction: 'warn' });
+      expect(audit[0].after).toEqual({ creditLimitAction: 'block' });
     });
 
     it('nothing changed → no audit row', async () => {

@@ -175,6 +175,23 @@ describe('Route access metadata (e2e)', () => {
     });
   });
 
+  it('the sale routes need their own permission', () => {
+    const sales = Object.fromEntries(
+      handlers
+        .filter((h) => h.name.startsWith('SalesController.'))
+        .map((h) => [h.name.split('.')[1], h.permissions]),
+    );
+
+    expect(sales).toEqual({
+      create: ['sale.create'],
+      list: ['sale.view'],
+      get: ['sale.view'],
+      update: ['sale.edit'],
+      // Cancel is how a sale is "deleted".
+      cancel: ['sale.delete'],
+    });
+  });
+
   it('only the expected routes are public', () => {
     const open = handlers
       .filter((h) => h.access === 'public')
