@@ -21,6 +21,7 @@ import { LedgerModule } from './modules/ledger/ledger.module';
 import { RatesModule } from './modules/rates/rates.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { StaffModule } from './modules/staff/staff.module';
+import { StatsModule } from './modules/stats/stats.module';
 import { TradersModule } from './modules/traders/traders.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { UsersModule } from './modules/users/users.module';
@@ -75,6 +76,7 @@ import { UsersModule } from './modules/users/users.module';
     CommoditiesModule,
     RatesModule,
     LedgerModule,
+    StatsModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },
