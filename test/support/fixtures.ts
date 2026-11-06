@@ -19,6 +19,9 @@ import {
   purchaseItems,
   purchases,
   refreshTokens,
+  saleCharges,
+  saleItems,
+  sales,
   tenantSettings,
   tenants,
   traders,
@@ -131,8 +134,13 @@ export class Fixtures {
             inArray(invitations.invitedBy, ids),
           ),
         );
-      // Purchases, khata, traders, rates, commodities and bill numbers of
+      // Sales, purchases, khata, traders, rates, commodities and bill numbers of
       // tracked shops (before their users and shops).
+      await this.db
+        .delete(saleCharges)
+        .where(inArray(saleCharges.tenantId, tIds));
+      await this.db.delete(saleItems).where(inArray(saleItems.tenantId, tIds));
+      await this.db.delete(sales).where(inArray(sales.tenantId, tIds));
       await this.db
         .delete(purchaseCharges)
         .where(inArray(purchaseCharges.tenantId, tIds));

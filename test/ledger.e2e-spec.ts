@@ -1006,14 +1006,14 @@ describe('Ledger /ledger (e2e)', () => {
       const owner = await fx.user('owner', other);
       const otherToken = await login(owner.phone);
       const t = await trader({}, otherToken);
-      const saleId = randomUUID();
-      // A sale entry with no registered sales yet (ticket 22).
+      const receiptId = randomUUID();
+      // A receipt entry: no receipts are registered yet (payments ticket).
       await fx.db.insert(ledgerEntries).values({
         tenantId: other,
         traderId: t.id,
         entryDate: '2026-10-02',
-        sourceType: 'sale',
-        sourceId: saleId,
+        sourceType: 'receipt',
+        sourceId: receiptId,
         credit: '300.00',
       });
       // A snapshot changed by hand.
@@ -1033,8 +1033,8 @@ describe('Ledger /ledger (e2e)', () => {
             expect.objectContaining({
               check: 'unexplained',
               traderId: t.id,
-              sourceType: 'sale',
-              sourceId: saleId,
+              sourceType: 'receipt',
+              sourceId: receiptId,
               actual: '-300.00',
             }),
             expect.objectContaining({

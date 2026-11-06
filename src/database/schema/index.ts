@@ -9,6 +9,7 @@ export * from './number-sequences';
 export * from './otp-codes';
 export * from './purchases';
 export * from './refresh-tokens';
+export * from './sales';
 export * from './tenants';
 export * from './tenant-settings';
 export * from './traders';
