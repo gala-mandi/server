@@ -62,7 +62,7 @@ describe('Sales /sales (e2e)', () => {
 
   const create = (
     body: Record<string, unknown> = {},
-    token = tokens.ownerA,
+    token: string | null = tokens.ownerA,
     key: string | null = randomUUID(),
   ) => {
     const req = as(http().post('/sales'), token);
@@ -77,15 +77,20 @@ describe('Sales /sales (e2e)', () => {
 
   const get = (id: string, token = tokens.ownerA) =>
     as(http().get(`/sales/${id}`), token);
-  const list = (query: Record<string, unknown> = {}, token = tokens.ownerA) =>
-    as(http().get('/sales'), token).query(query);
+  const list = (
+    query: Record<string, unknown> = {},
+    token: string | null = tokens.ownerA,
+  ) => as(http().get('/sales'), token).query(query);
   const patch = (id: string, body: object, token = tokens.ownerA) =>
     as(http().patch(`/sales/${id}`), token).send(body);
   const cancel = (id: string, token = tokens.ownerA) =>
     as(http().post(`/sales/${id}/cancel`), token);
 
   /** The stored sale as GET returns it (no warnings). */
-  const withoutWarnings = ({ warnings: _w, ...sale }: SavedSale) => sale;
+  const withoutWarnings = (sale: SavedSale) =>
+    Object.fromEntries(
+      Object.entries(sale).filter(([key]) => key !== 'warnings'),
+    );
 
   function resetThrottle(): void {
     const storage = app.get<ThrottlerStorageService>(getStorageToken(), {
