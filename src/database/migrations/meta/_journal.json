@@ -85,6 +85,13 @@
       "when": 1793943118105,
       "tag": "0011_ledger_daily_balances",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793945262104,
+      "tag": "0012_purchases",
+      "breakpoints": true
     }
   ]
 }

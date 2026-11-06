@@ -15,7 +15,12 @@ import {
   type SQL,
   sql,
 } from 'drizzle-orm';
-import { commodities, dailyRates, tenantSettings } from '../../database/schema';
+import {
+  commodities,
+  dailyRates,
+  purchaseItems,
+  tenantSettings,
+} from '../../database/schema';
 import {
   TenantDatabase,
   type TenantScope,
@@ -229,9 +234,8 @@ export class CommoditiesService implements OnModuleInit {
   }
 
   /**
-   * One check per table that points at commodities. `purchase_items` and
-   * `sale_items` don't exist yet: the purchases and sales tickets each add
-   * their check here.
+   * One check per table that points at commodities. `sale_items` doesn't
+   * exist yet: the sales ticket adds its check here.
    */
   private readonly usageChecks: ((
     scope: TenantScope,
@@ -240,6 +244,11 @@ export class CommoditiesService implements OnModuleInit {
     async ({ scoped }, commodityId) =>
       (await scoped(dailyRates).count(
         eq(dailyRates.commodityId, commodityId),
+      )) > 0,
+    // Items of cancelled purchases count too: the bill stays readable.
+    async ({ scoped }, commodityId) =>
+      (await scoped(purchaseItems).count(
+        eq(purchaseItems.commodityId, commodityId),
       )) > 0,
   ];
 

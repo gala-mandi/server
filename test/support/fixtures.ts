@@ -15,6 +15,9 @@ import {
   ledgerEntries,
   numberSequences,
   otpCodes,
+  purchaseCharges,
+  purchaseItems,
+  purchases,
   refreshTokens,
   tenantSettings,
   tenants,
@@ -128,8 +131,15 @@ export class Fixtures {
             inArray(invitations.invitedBy, ids),
           ),
         );
-      // Khata, traders, rates, commodities and bill numbers of tracked shops
-      // (before their users and shops).
+      // Purchases, khata, traders, rates, commodities and bill numbers of
+      // tracked shops (before their users and shops).
+      await this.db
+        .delete(purchaseCharges)
+        .where(inArray(purchaseCharges.tenantId, tIds));
+      await this.db
+        .delete(purchaseItems)
+        .where(inArray(purchaseItems.tenantId, tIds));
+      await this.db.delete(purchases).where(inArray(purchases.tenantId, tIds));
       await this.db
         .delete(ledgerEntries)
         .where(inArray(ledgerEntries.tenantId, tIds));
