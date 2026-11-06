@@ -15,7 +15,7 @@ import {
   type SQL,
   sql,
 } from 'drizzle-orm';
-import { commodities, tenantSettings } from '../../database/schema';
+import { commodities, dailyRates, tenantSettings } from '../../database/schema';
 import {
   TenantDatabase,
   type TenantScope,
@@ -229,14 +229,19 @@ export class CommoditiesService implements OnModuleInit {
   }
 
   /**
-   * One check per table that points at commodities. `daily_rates`,
-   * `purchase_items` and `sale_items` don't exist yet: the rates, purchases
-   * and sales tickets each add their check here.
+   * One check per table that points at commodities. `purchase_items` and
+   * `sale_items` don't exist yet: the purchases and sales tickets each add
+   * their check here.
    */
   private readonly usageChecks: ((
     scope: TenantScope,
     commodityId: string,
-  ) => Promise<boolean>)[] = [];
+  ) => Promise<boolean>)[] = [
+    async ({ scoped }, commodityId) =>
+      (await scoped(dailyRates).count(
+        eq(dailyRates.commodityId, commodityId),
+      )) > 0,
+  ];
 
   /** Whether any rate, purchase or sale uses this commodity. */
   private async isInUse(scope: TenantScope, id: string): Promise<boolean> {

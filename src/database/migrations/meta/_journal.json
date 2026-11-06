@@ -71,6 +71,13 @@
       "when": 1793910837512,
       "tag": "0009_number_sequences",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793915892078,
+      "tag": "0010_daily_rates",
+      "breakpoints": true
     }
   ]
 }

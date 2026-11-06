@@ -9,6 +9,7 @@ import {
   auditLogs,
   authLogs,
   commodities,
+  dailyRates,
   invitations,
   ledgerEntries,
   numberSequences,
@@ -126,12 +127,15 @@ export class Fixtures {
             inArray(invitations.invitedBy, ids),
           ),
         );
-      // Khata, traders, commodities and bill numbers of tracked shops (before their users
-      // and shops).
+      // Khata, traders, rates, commodities and bill numbers of tracked shops
+      // (before their users and shops).
       await this.db
         .delete(ledgerEntries)
         .where(inArray(ledgerEntries.tenantId, tIds));
       await this.db.delete(traders).where(inArray(traders.tenantId, tIds));
+      await this.db
+        .delete(dailyRates)
+        .where(inArray(dailyRates.tenantId, tIds));
       await this.db
         .delete(commodities)
         .where(inArray(commodities.tenantId, tIds));
