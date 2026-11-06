@@ -42,6 +42,11 @@ export const tenantSettings = pgTable(
     financialYearStart: date('financial_year_start'),
     // en | ur
     language: varchar('language', { length: 5 }).notNull().default('en'),
+    // What a sale does when the buyer goes over their credit limit:
+    // warn | block
+    creditLimitAction: varchar('credit_limit_action', { length: 10 })
+      .notNull()
+      .default('warn'),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
