@@ -50,6 +50,33 @@ export function bookRows(
   });
 }
 
+/**
+ * The item-level totals of report rows (bags, kg, gross), exactly. The rows
+ * split the lines without overlap (by day, trader or commodity), so these
+ * are the totals of the whole range. Bills are added up too, which is right
+ * unless the rows are commodities (a bill can be in two of them).
+ */
+export function lineTotals(
+  rows: readonly BookRow[],
+): Pick<BookRow, 'bills' | 'bags' | 'weightKg' | 'grossAmount'> {
+  let bags = 0;
+  let bills = 0;
+  let weight = new Decimal(0);
+  let gross = new Decimal(0);
+  for (const row of rows) {
+    bills += row.bills;
+    bags += row.bags;
+    weight = weight.plus(row.weightKg);
+    gross = gross.plus(row.grossAmount);
+  }
+  return {
+    bills,
+    bags,
+    weightKg: weight.toFixed(3),
+    grossAmount: gross.toFixed(2),
+  };
+}
+
 /** One charge-line sum: a day, a side (purchases or sales) and a type. */
 export interface ChargeSum {
   date: string;

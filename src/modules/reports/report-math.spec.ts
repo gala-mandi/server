@@ -1,6 +1,7 @@
 import {
   bookRows,
   commissionTotals,
+  lineTotals,
   outstandingSides,
   type TraderBalance,
 } from './report-math';
@@ -53,6 +54,44 @@ describe('bookRows()', () => {
     const [row] = bookRows(lines.slice(0, 1), null);
     expect(row.charges).toBeNull();
     expect(row.netAmount).toBeNull();
+  });
+});
+
+describe('lineTotals()', () => {
+  it('adds bills, bags, kg and gross exactly', () => {
+    const rows = bookRows(
+      [
+        {
+          key: 'a',
+          label: 'a',
+          bills: 2,
+          bags: 3,
+          weightKg: '0.1',
+          grossAmount: '0.10',
+        },
+        {
+          key: 'b',
+          label: 'b',
+          bills: 1,
+          bags: 0,
+          weightKg: '0.2',
+          grossAmount: '0.20',
+        },
+      ],
+      null,
+    );
+    expect(lineTotals(rows)).toEqual({
+      bills: 3,
+      bags: 3,
+      weightKg: '0.300',
+      grossAmount: '0.30',
+    });
+    expect(lineTotals([])).toEqual({
+      bills: 0,
+      bags: 0,
+      weightKg: '0.000',
+      grossAmount: '0.00',
+    });
   });
 });
 

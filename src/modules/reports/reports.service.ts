@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { and, asc, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
+import Decimal from 'decimal.js';
+import { and, asc, eq, gte, lte, sql, type SQLWrapper } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import type { ChargeType } from '../../common/charges/calculate-transaction';
 import { karachiDate } from '../../common/time/karachi-date';
@@ -26,6 +27,7 @@ import {
   type BillSums,
   type BookRow,
   bookRows,
+  lineTotals,
   type ChargeSum,
   commissionTotals,
   type LineSums,
@@ -109,14 +111,16 @@ interface BookResult {
 }
 
 // Sums are cast wider than the columns: a year of bills can pass 14 digits.
-const money = (column: PgColumn | SQL) =>
-  sql<string>`coalesce(sum(${column}), 0)::numeric(20,2)::text`;
-const kg = (column: PgColumn) =>
-  sql<string>`coalesce(sum(${column}), 0)::numeric(20,3)::text`;
-const intSum = (column: PgColumn) =>
-  sql<number>`coalesce(sum(${column}), 0)::int`;
-const billCount = (column: PgColumn) =>
-  sql<number>`count(distinct ${column})::int`;
+const money = (value: SQLWrapper) =>
+  sql<string>`coalesce(sum(${value}), 0)::numeric(20,2)::text`;
+const kg = (value: SQLWrapper) =>
+  sql<string>`coalesce(sum(${value}), 0)::numeric(20,3)::text`;
+const intSum = (value: SQLWrapper) =>
+  sql<number>`coalesce(sum(${value}), 0)::int`;
+const rowCount = sql<number>`count(*)::int`;
+
+const sumOf = (values: string[]) =>
+  values.reduce((sum, v) => sum.plus(v), new Decimal(0)).toFixed(2);
 
 const invalid = (errors: { field: string; message: string }[]) =>
   new BadRequestException({ message: 'Validation failed', errors });
@@ -337,17 +341,53 @@ export class ReportsService {
     );
   }
 
-  /** Live item lines of those bills (and of the commodity, if any). */
-  private linesWhere(scope: TenantScope, book: Book, filter: BookFilter) {
-    return and(
-      scope
-        .scoped(book.items)
+  /**
+   * One row per posted bill in the range (per bill and commodity for a
+   * commodity split) with its item lines summed and its own amounts. Bills
+   * are then counted with `count(*)` instead of a sorting `count(distinct)`,
+   * and the bill-level amounts come from the same pass.
+   */
+  private perBill(
+    scope: TenantScope,
+    book: Book,
+    filter: BookFilter,
+    byCommodity: boolean,
+  ) {
+    const { items, bills } = book;
+    const commodity = byCommodity
+      ? sql<string>`${items.commodityId}`
+      : sql<string>`null::uuid`;
+    return (
+      scope.tx
+        .select({
+          billId: sql<string>`${bills.id}`.as('bill_id'),
+          date: sql<string>`${book.date}`.as('bill_date'),
+          traderId: sql<string>`${book.trader}`.as('trader_id'),
+          commodityId: commodity.as('commodity_id'),
+          bags: sql<string>`sum(${items.bags})`.as('bags'),
+          weightKg: sql<string>`sum(${items.weightKg})`.as('weight_kg'),
+          amount: sql<string>`sum(${items.amount})`.as('amount'),
+          charges: sql<string>`${book.charges}`.as('charges'),
+          net: sql<string>`${book.net}`.as('net'),
+          settled: sql<string>`${book.settled}`.as('settled'),
+        })
+        .from(items)
+        .innerJoin(bills, eq(bills.id, book.itemBill))
         .where(
-          filter.commodity
-            ? eq(book.items.commodityId, filter.commodity)
-            : undefined,
-        ),
-      this.billsWhere(scope, book, filter),
+          and(
+            scope
+              .scoped(items)
+              .where(
+                filter.commodity
+                  ? eq(items.commodityId, filter.commodity)
+                  : undefined,
+              ),
+            this.billsWhere(scope, book, filter),
+          ),
+        )
+        // bills.id is the key: its other columns follow from it.
+        .groupBy(...(byCommodity ? [bills.id, items.commodityId] : [bills.id]))
+        .as('per_bill')
     );
   }
 
@@ -358,109 +398,103 @@ export class ReportsService {
     filter: BookFilter,
   ): Promise<BookResult> {
     const { tx } = scope;
-    const { items, bills } = book;
-    // A commodity split cuts bills apart: their deductions and net can't be.
-    const billLevel = groupBy !== 'commodity' && !filter.commodity;
-
-    const lineMetrics = {
-      bills: billCount(bills.id),
-      bags: intSum(items.bags),
-      weightKg: kg(items.weightKg),
-      grossAmount: money(items.amount),
+    const bill = this.perBill(scope, book, filter, groupBy === 'commodity');
+    const metrics = {
+      bills: sql<number>`count(*)::int`,
+      bags: intSum(bill.bags),
+      weightKg: kg(bill.weightKg),
+      grossAmount: money(bill.amount),
+      charges: money(bill.charges),
+      netAmount: money(bill.net),
     };
 
-    let lines: LineSums[];
+    let rows: (LineSums & BillSums)[];
     if (groupBy === 'day') {
-      lines = await tx
+      rows = await tx
         .select({
-          key: sql<string>`${book.date}::text`,
-          label: sql<string>`${book.date}::text`,
-          ...lineMetrics,
+          key: sql<string>`${bill.date}::text`,
+          label: sql<string>`${bill.date}::text`,
+          ...metrics,
         })
-        .from(items)
-        .innerJoin(bills, eq(bills.id, book.itemBill))
-        .where(this.linesWhere(scope, book, filter))
-        .groupBy(book.date)
-        .orderBy(asc(book.date));
+        .from(bill)
+        .groupBy(bill.date)
+        .orderBy(asc(bill.date));
     } else if (groupBy === 'commodity') {
-      lines = await tx
+      rows = await tx
         .select({
           key: sql<string>`${commodities.id}::text`,
           label: commodities.name,
-          ...lineMetrics,
+          ...metrics,
         })
-        .from(items)
-        .innerJoin(bills, eq(bills.id, book.itemBill))
-        // Inner join with soft-deleted ones too: old bills keep their names.
-        .innerJoin(commodities, eq(commodities.id, items.commodityId))
-        .where(this.linesWhere(scope, book, filter))
+        .from(bill)
+        // Soft-deleted ones too: old bills keep their names.
+        .innerJoin(commodities, eq(commodities.id, bill.commodityId))
         .groupBy(commodities.id, commodities.name)
         .orderBy(asc(commodities.name), asc(commodities.id));
     } else {
-      lines = await tx
+      rows = await tx
         .select({
           key: sql<string>`${traders.id}::text`,
           label: traders.name,
-          ...lineMetrics,
+          ...metrics,
         })
-        .from(items)
-        .innerJoin(bills, eq(bills.id, book.itemBill))
-        .innerJoin(traders, eq(traders.id, book.trader))
-        .where(this.linesWhere(scope, book, filter))
+        .from(bill)
+        .innerJoin(traders, eq(traders.id, bill.traderId))
         .groupBy(traders.id, traders.name)
         .orderBy(asc(traders.name), asc(traders.id));
     }
 
-    let billRows: BillSums[] | null = null;
+    // A commodity split cuts bills apart: their deductions and net can't be.
+    const billLevel = groupBy !== 'commodity' && !filter.commodity;
+    const result = bookRows(rows, billLevel ? rows : null);
+    const lines = lineTotals(result);
     if (billLevel) {
-      const key = groupBy === 'day' ? book.date : book.trader;
-      billRows = await tx
-        .select({
-          key: sql<string>`${key}::text`,
-          charges: money(book.charges),
-          netAmount: money(book.net),
-        })
-        .from(bills)
-        .where(this.billsWhere(scope, book, filter))
-        .groupBy(key);
+      // Rows are whole bills: their sums are the totals.
+      return {
+        rows: result,
+        totals: {
+          ...lines,
+          charges: sumOf(result.map((r) => r.charges ?? '0')),
+          netAmount: sumOf(result.map((r) => r.netAmount ?? '0')),
+        },
+      };
     }
-
-    const totals = await this.bookTotals(scope, book, filter);
-    return {
-      rows: bookRows(lines, billRows),
-      totals: {
-        bills: totals.bills,
-        bags: totals.bags,
-        weightKg: totals.weightKg,
-        grossAmount: totals.grossAmount,
-        charges: filter.commodity ? null : totals.charges,
-        netAmount: filter.commodity ? null : totals.netAmount,
-      },
-    };
-  }
-
-  /** Whole-range totals of a book: item lines and bills. */
-  private async bookTotals(scope: TenantScope, book: Book, filter: BookFilter) {
-    const { tx } = scope;
-    const [lines] = await tx
-      .select({
-        bills: billCount(book.bills.id),
-        bags: intSum(book.items.bags),
-        weightKg: kg(book.items.weightKg),
-        grossAmount: money(book.items.amount),
-      })
-      .from(book.items)
-      .innerJoin(book.bills, eq(book.bills.id, book.itemBill))
-      .where(this.linesWhere(scope, book, filter));
+    if (filter.commodity) {
+      // One commodity's lines: bill-level amounts can't be split off, and
+      // each bill is in one day, trader or (this) commodity row only.
+      return {
+        rows: result,
+        totals: { ...lines, charges: null, netAmount: null },
+      };
+    }
+    // By commodity: a bill with two commodities is in two rows, so bills and
+    // their amounts are counted from the bills themselves.
     const [bills] = await tx
       .select({
+        bills: rowCount,
         charges: money(book.charges),
         netAmount: money(book.net),
-        settled: money(book.settled),
       })
       .from(book.bills)
       .where(this.billsWhere(scope, book, filter));
-    return { ...lines, ...bills };
+    return { rows: result, totals: { ...lines, ...bills } };
+  }
+
+  /** Whole-range totals of a book: its item lines and its bills. */
+  private async bookTotals(scope: TenantScope, book: Book, filter: BookFilter) {
+    const bill = this.perBill(scope, book, filter, false);
+    const [totals] = await scope.tx
+      .select({
+        bills: rowCount,
+        bags: intSum(bill.bags),
+        weightKg: kg(bill.weightKg),
+        grossAmount: money(bill.amount),
+        charges: money(bill.charges),
+        netAmount: money(bill.net),
+        settled: money(bill.settled),
+      })
+      .from(bill);
+    return totals;
   }
 
   /** Charge lines of posted bills in the range, by day, side and type. */
