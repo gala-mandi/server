@@ -106,6 +106,13 @@
       "when": 1793963941359,
       "tag": "0014_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793983293099,
+      "tag": "0015_plans_subscriptions",
+      "breakpoints": true
     }
   ]
 }

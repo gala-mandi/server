@@ -10,6 +10,8 @@ import {
   lockPhone,
   phoneTaken,
 } from '../staff/phone-account';
+import { assertUserSeat } from '../subscriptions/subscription-queries';
+import { planUserLimitOnAccept } from '../subscriptions/subscription-errors';
 import type { AcceptInviteDto } from './dto/auth-requests.dto';
 import { PasswordService } from './password.service';
 import type { RequestMeta } from './request-meta';
@@ -102,6 +104,9 @@ export class AcceptInviteService {
         )
         .returning({ acceptedAt: invitations.acceptedAt });
       if (!claimed) throw MESSAGES.accepted();
+      // The claimed invite no longer counts; fails only if the shop's plan
+      // was lowered after the invite was sent.
+      await assertUserSeat(tx, invite.tenantId, planUserLimitOnAccept);
 
       const [taken] = await tx
         .select({ id: users.id })

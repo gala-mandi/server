@@ -7,6 +7,7 @@ import { invitations, tenants, users } from '../../database/schema';
 import { TenantDatabase } from '../../database/tenant-database';
 import { normalizePhone } from '../auth/identifier';
 import { PasswordService } from '../auth/password.service';
+import { assertUserSeat } from '../subscriptions/subscription-queries';
 import { temporaryPassword } from '../tenants/tenants.service';
 import { INVITE_SENDER, type InviteSender } from './invite-sender';
 import { isPhoneUniqueViolation, lockPhone, phoneTaken } from './phone-account';
@@ -114,6 +115,8 @@ export class StaffService {
         await this.assertPhoneFree(tx, phone);
 
         await this.cancelPending(tx, tenantId, phone, audit);
+        // After the cancel: re-inviting the same phone takes no extra seat.
+        await assertUserSeat(tx, tenantId);
 
         const { token, tokenHash } = createInviteToken();
         const [row] = await tx
@@ -167,6 +170,7 @@ export class StaffService {
       await this.assertPhoneFree(tx, phone);
       // An open invite link for this phone would now fail; close it.
       await this.cancelPending(tx, tenantId, phone, audit);
+      await assertUserSeat(tx, tenantId);
       const [user] = await tx
         .insert(users)
         .values({

@@ -1,4 +1,10 @@
-import { isCalendarDate, karachiDate, previousDate } from './karachi-date';
+import {
+  addDays,
+  daysBetween,
+  isCalendarDate,
+  karachiDate,
+  previousDate,
+} from './karachi-date';
 
 describe('karachiDate', () => {
   it('00:30 in Pakistan is already the new day (19:30 UTC the day before)', () => {
@@ -67,5 +73,30 @@ describe('isCalendarDate', () => {
     '',
   ])('%s is not', (v) => {
     expect(isCalendarDate(v)).toBe(false);
+  });
+});
+
+describe('addDays', () => {
+  it.each([
+    ['2026-11-06', 14, '2026-11-20'],
+    ['2026-02-27', 2, '2026-03-01'],
+    ['2028-02-28', 1, '2028-02-29'],
+    ['2026-12-31', 1, '2027-01-01'],
+    ['2026-11-06', 0, '2026-11-06'],
+    ['2026-03-01', -1, '2026-02-28'],
+  ])('%s + %d → %s', (date, days, expected) => {
+    expect(addDays(date, days)).toBe(expected);
+  });
+});
+
+describe('daysBetween', () => {
+  it.each([
+    ['2026-11-06', '2026-11-06', 0],
+    ['2026-11-06', '2026-11-09', 3],
+    ['2026-11-09', '2026-11-06', -3],
+    ['2026-02-28', '2026-03-01', 1],
+    ['2026-12-25', '2027-01-08', 14],
+  ])('%s → %s is %d days', (from, to, expected) => {
+    expect(daysBetween(from, to)).toBe(expected);
   });
 });

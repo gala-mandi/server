@@ -11,7 +11,8 @@ import { diffChanges, maskSensitive } from './audit-diff';
 
 type Tx = PgTransaction<any, any, any>;
 
-export type AuditAction = 'create' | 'update' | 'delete' | 'restore';
+// remind: the daily job reminded a shop that its plan ends soon.
+export type AuditAction = 'create' | 'update' | 'delete' | 'restore' | 'remind';
 
 /** Who did it; filled from the request context. */
 export interface AuditActor {

@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { ClsModule } from 'nestjs-cls';
@@ -26,6 +27,8 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { StatsModule } from './modules/stats/stats.module';
+import { SubscriptionGuard } from './modules/subscriptions/subscription.guard';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { TradersModule } from './modules/traders/traders.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { UsersModule } from './modules/users/users.module';
@@ -68,6 +71,8 @@ import { UsersModule } from './modules/users/users.module';
         errorMessage: 'Too many requests, please try again later',
       }),
     }),
+    // Daily subscription check (expiry, reminders).
+    ScheduleModule.forRoot(),
     DatabaseModule,
     HealthModule,
     AuthModule,
@@ -85,6 +90,7 @@ import { UsersModule } from './modules/users/users.module';
     SalesModule,
     PaymentsModule,
     ReportsModule,
+    SubscriptionsModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },
@@ -93,6 +99,8 @@ import { UsersModule } from './modules/users/users.module';
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    // Then the shop's plan: writes refused once it is read-only.
+    { provide: APP_GUARD, useExisting: SubscriptionGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],
 })

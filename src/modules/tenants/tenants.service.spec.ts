@@ -9,6 +9,7 @@ import {
   auditLogs,
   commodities,
   tenantSettings,
+  tenantSubscriptions,
   tenants,
   users,
 } from '../../database/schema';
@@ -17,11 +18,14 @@ import {
   DEFAULT_COMMODITIES,
   defaultCommodityRows,
 } from '../commodities/default-commodities';
+import type { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import type { CreateTenantInput } from './tenants.dto';
 import { slugify, temporaryPassword, TenantsService } from './tenants.service';
 
 const SHOP = '11111111-1111-4111-8111-111111111111';
 const OWNER = '22222222-2222-4222-8222-222222222222';
+const TRIAL_PLAN = '33333333-3333-4333-8333-333333333333';
+const SUBSCRIPTION = '44444444-4444-4444-8444-444444444444';
 const NOW = new Date('2026-10-01T00:00:00Z');
 
 const ALPHABET =
@@ -127,7 +131,9 @@ const tableName = (table: PgTable): string =>
           ? 'audit_logs'
           : table === commodities
             ? 'commodities'
-            : 'unknown';
+            : table === tenantSubscriptions
+              ? 'tenant_subscriptions'
+              : 'unknown';
 
 /**
  * A Drizzle query that can be chained (`.from().where().limit()` …) and
@@ -160,6 +166,8 @@ interface FakeOptions {
   failInsert?: { table: string; error: Error };
   /** Throws instead of writing the audit row for this entity. */
   failAudit?: { entity: string; error: Error };
+  /** No active Trial plan to start the shop on. */
+  noTrial?: boolean;
   /** What the "owner phone/email taken?" select finds. */
   taken?: { phone: string; email: string | null };
 }
@@ -198,10 +206,11 @@ const ownerRow = {
 function fakePlatform(options: FakeOptions = {}) {
   const steps: Step[] = [];
   // select() answers in the order create() asks: phone/email taken?, slug
-  // taken?, then detail(): tenant row, owner, user counts.
+  // taken?, the Trial plan, then detail(): tenant row, owner, user counts.
   const selects: unknown[][] = [
     options.taken ? [options.taken] : [],
     [],
+    options.noTrial ? [] : [{ id: TRIAL_PLAN }],
     [tenantRow],
     [ownerRow],
     [{ tenantId: SHOP, n: 1 }],
@@ -214,6 +223,7 @@ function fakePlatform(options: FakeOptions = {}) {
       ...row,
       id: `c0000000-0000-4000-8000-00000000000${i}`,
     })),
+    tenant_subscriptions: [{ id: SUBSCRIPTION, tenantId: SHOP }],
   };
   const values: Record<string, unknown> = {};
 
@@ -271,9 +281,14 @@ function serviceWith(fake: ReturnType<typeof fakePlatform>) {
   const passwords = {
     hash: jest.fn((plain: string) => Promise.resolve(`hash(${plain})`)),
   };
+  const subscriptions = {
+    viewFor: jest.fn(() => Promise.resolve(null)),
+    briefsFor: jest.fn(() => Promise.resolve(new Map())),
+  };
   const service = new TenantsService(
     fake.platform as unknown as PlatformDatabase,
     passwords as unknown as PasswordService,
+    subscriptions as unknown as SubscriptionsService,
   );
   return { service, passwords };
 }
@@ -315,9 +330,12 @@ describe('TenantsService.create()', () => {
       { kind: 'insert', table: 'users' },
       { kind: 'insert', table: 'tenant_settings' },
       { kind: 'insert', table: 'commodities' },
+      // Every new shop starts on the Trial plan.
+      { kind: 'insert', table: 'tenant_subscriptions' },
       { kind: 'audit', entity: 'tenants' },
       { kind: 'audit', entity: 'users' },
       { kind: 'audit', entity: 'tenant_settings' },
+      { kind: 'audit', entity: 'tenant_subscriptions' },
       // One create audit row per default commodity.
       ...DEFAULT_COMMODITIES.map(() => ({
         kind: 'audit',
@@ -357,6 +375,20 @@ describe('TenantsService.create()', () => {
     }
   });
 
+  it('without an active Trial plan: TRIAL_PLAN_MISSING and nothing is saved', async () => {
+    const fake = fakePlatform({ noTrial: true });
+    const { service } = serviceWith(fake);
+
+    await expect(service.create(input)).rejects.toMatchObject({
+      response: { code: 'TRIAL_PLAN_MISSING' },
+    });
+    expect(fake.steps.at(-1)).toMatchObject({ kind: 'rollback' });
+    expect(fake.steps).not.toContainEqual({
+      kind: 'insert',
+      table: 'tenant_subscriptions',
+    });
+  });
+
   it.each([
     ['the settings insert', { failInsert: { table: 'tenant_settings' } }],
     ['the owner insert', { failInsert: { table: 'users' } }],
@@ -368,6 +400,14 @@ describe('TenantsService.create()', () => {
       { failInsert: { table: 'commodities' } },
     ],
     ['a commodity audit row', { failAudit: { entity: 'commodities' } }],
+    [
+      'the Trial subscription insert',
+      { failInsert: { table: 'tenant_subscriptions' } },
+    ],
+    [
+      'the subscription audit row',
+      { failAudit: { entity: 'tenant_subscriptions' } },
+    ],
   ])(
     'when %s fails: the transaction rolls back, the error is rethrown and no password is returned',
     async (_label, where) => {
