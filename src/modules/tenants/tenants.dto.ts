@@ -1,6 +1,10 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { tenantStatus } from '../../database/schema';
+import {
+  subscriptionBriefSchema,
+  subscriptionViewSchema,
+} from '../subscriptions/subscriptions.dto';
 
 const phone = z
   .string()
@@ -65,7 +69,13 @@ export const tenantSummarySchema = z.object({
   createdAt: z.iso.datetime(),
 });
 
+export const tenantListItemSchema = tenantSummarySchema.extend({
+  /** Current plan, end date and access state; null without a plan. */
+  subscription: subscriptionBriefSchema.nullable(),
+});
+
 export const tenantDetailSchema = tenantSummarySchema.extend({
+  subscription: subscriptionViewSchema.nullable(),
   email: z.string().nullable(),
   address: z.string().nullable(),
   logoUrl: z.string().nullable(),
@@ -83,6 +93,7 @@ export const tenantDetailSchema = tenantSummarySchema.extend({
 });
 
 export type TenantSummary = z.infer<typeof tenantSummarySchema>;
+export type TenantListItem = z.infer<typeof tenantListItemSchema>;
 export type TenantDetail = z.infer<typeof tenantDetailSchema>;
 
 export class CreateTenantDto extends createZodDto(createTenantSchema) {}
@@ -91,7 +102,7 @@ export class ListTenantsQueryDto extends createZodDto(listTenantsQuerySchema) {}
 export class TenantDetailDto extends createZodDto(tenantDetailSchema) {}
 export class TenantPageDto extends createZodDto(
   z.object({
-    data: z.array(tenantSummarySchema),
+    data: z.array(tenantListItemSchema),
     meta: z.object({
       page: z.number().int(),
       limit: z.number().int(),

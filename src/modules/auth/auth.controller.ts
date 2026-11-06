@@ -27,6 +27,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import type { AuthUser } from '../../common/auth/auth-user';
+import { AllowReadOnly } from '../../common/decorators/allow-read-only.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ALL_ROLES } from '../../common/auth/permissions';
 import { Public } from '../../common/decorators/public.decorator';
@@ -59,6 +60,8 @@ import {
 import { requestMeta } from './request-meta';
 
 @ApiTags('auth')
+// Signing in and out and passwords work in read-only mode too.
+@AllowReadOnly()
 @Controller('auth')
 export class AuthController {
   private readonly cookie: RefreshCookieConfig;

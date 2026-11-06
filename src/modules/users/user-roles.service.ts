@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
+import { assertUserSeat } from '../subscriptions/subscription-queries';
 import type { AuthUser, Role } from '../../common/auth/auth-user';
 import { roleHas } from '../../common/auth/permissions';
 import { users } from '../../database/schema';
@@ -116,6 +117,10 @@ export class UserRolesService {
       const target = await this.target(scope, userId);
       if (!isActive && target.role === 'owner' && target.isActive) {
         await this.assertAnotherActiveOwner(scope, target.id);
+      }
+      // Turning a user back on takes a seat of the plan.
+      if (isActive && !target.isActive) {
+        await assertUserSeat(scope.tx, scope.tenantId);
       }
       const after =
         target.isActive === isActive

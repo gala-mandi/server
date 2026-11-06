@@ -20,7 +20,8 @@ export const auditLogs = pgTable(
     userId: uuid('user_id').references(() => users.id),
     entity: varchar('entity', { length: 40 }).notNull(),
     entityId: uuid('entity_id').notNull(),
-    // create | update | delete | restore | access (super-admin entering a shop)
+    // create | update | delete | restore | access (super-admin entering a
+    // shop) | remind (plan-ending reminder from the daily job)
     action: varchar('action', { length: 10 }).notNull(),
     before: jsonb('before'),
     after: jsonb('after'),

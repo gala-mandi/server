@@ -41,12 +41,38 @@ export class PlatformDatabase {
     if (!this.cls.isActive() || this.cls.get('role') !== 'super_admin') {
       throw new ForbiddenException('Only the platform admin can do this');
     }
-    const actor = {
-      userId: this.cls.get('userId') ?? null,
-      ip: this.cls.get('ip') ?? null,
-      userAgent: this.cls.get('userAgent') ?? null,
-    };
+    return this.run(
+      {
+        userId: this.cls.get('userId') ?? null,
+        ip: this.cls.get('ip') ?? null,
+        userAgent: this.cls.get('userAgent') ?? null,
+      },
+      fn,
+    );
+  }
 
+  /**
+   * Platform work no person starts: scheduled jobs (e.g. the daily
+   * subscription check). Refused inside a signed-in request, so a request
+   * can never use it to step outside its shop. Audit rows have no user.
+   */
+  scheduledTransaction<R>(
+    fn: (scope: PlatformScope) => Promise<R>,
+  ): Promise<R> {
+    if (this.cls.isActive() && this.cls.get('userId')) {
+      throw new ForbiddenException('Only scheduled jobs can do this');
+    }
+    return this.run({ userId: null, ip: null, userAgent: null }, fn);
+  }
+
+  private run<R>(
+    actor: {
+      userId: string | null;
+      ip: string | null;
+      userAgent: string | null;
+    },
+    fn: (scope: PlatformScope) => Promise<R>,
+  ): Promise<R> {
     return this.db.transaction((tx) =>
       fn({
         tx,

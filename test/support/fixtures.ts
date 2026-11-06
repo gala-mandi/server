@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import * as argon2 from 'argon2';
 import { argon2Options } from '../../src/modules/auth/password.service';
-import { inArray, or } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
+import { addDays, karachiDate } from '../../src/common/time/karachi-date';
 import * as schema from '../../src/database/schema';
 import {
   auditLogs,
@@ -17,6 +18,7 @@ import {
   otpCodes,
   paymentAllocations,
   payments,
+  plans,
   purchaseCharges,
   purchaseItems,
   purchases,
@@ -25,6 +27,7 @@ import {
   saleItems,
   sales,
   tenantSettings,
+  tenantSubscriptions,
   tenants,
   traders,
   users,
@@ -43,6 +46,8 @@ export class Fixtures {
   private counter = 0;
   private readonly tenantIds: string[] = [];
   private readonly userIds: string[] = [];
+  private readonly planIds: string[] = [];
+  private testPlan?: Promise<string>;
   private passwordHash?: Promise<string>;
 
   /** 11-digit phone, unique for this run. */
@@ -64,7 +69,70 @@ export class Fixtures {
       })
       .returning({ id: tenants.id });
     this.tenantIds.push(row.id);
+    // Like a shop made through the API, it has a running plan; the test plan
+    // has room for every user a test adds.
+    await this.subscription(row.id, { planId: await this.roomyPlan() });
     return row.id;
+  }
+
+  /** A plan for this run, removed in `cleanup()`. */
+  async plan(
+    values: Partial<typeof plans.$inferInsert> = {},
+  ): Promise<typeof plans.$inferSelect> {
+    this.counter += 1;
+    const [row] = await this.db
+      .insert(plans)
+      .values({
+        name: `Test plan ${this.run}-${this.counter}`,
+        maxUsers: 100,
+        priceMonthly: '0.00',
+        ...values,
+      })
+      .returning();
+    this.planIds.push(row.id);
+    return row;
+  }
+
+  /** A plan with room for 100 users, shared by this run's shops. */
+  private roomyPlan(): Promise<string> {
+    this.testPlan ??= this.plan().then((p) => p.id);
+    return this.testPlan;
+  }
+
+  /**
+   * Gives a shop a subscription (default: 14 days from today, Pakistan date,
+   * on this run's roomy plan). Pass dates in the past to test grace and
+   * read-only mode.
+   */
+  async subscription(
+    tenantId: string,
+    values: Partial<typeof tenantSubscriptions.$inferInsert> = {},
+  ): Promise<typeof tenantSubscriptions.$inferSelect> {
+    const today = karachiDate();
+    const [row] = await this.db
+      .insert(tenantSubscriptions)
+      .values({
+        tenantId,
+        planId: values.planId ?? (await this.roomyPlan()),
+        startsOn: addDays(today, -30),
+        endsOn: addDays(today, 14),
+        status: 'active',
+        ...values,
+      })
+      .returning();
+    return row;
+  }
+
+  /** Removes a shop's subscriptions (e.g. before giving it a new one). */
+  async clearSubscriptions(tenantId: string): Promise<void> {
+    await this.db
+      .delete(tenantSubscriptions)
+      .where(eq(tenantSubscriptions.tenantId, tenantId));
+  }
+
+  /** A plan created through the API: removed in `cleanup()`. */
+  trackPlan(id: string): void {
+    if (!this.planIds.includes(id)) this.planIds.push(id);
   }
 
   async user(
@@ -178,7 +246,19 @@ export class Fixtures {
       await this.db
         .delete(tenantSettings)
         .where(inArray(tenantSettings.tenantId, tIds));
+      await this.db
+        .delete(tenantSubscriptions)
+        .where(inArray(tenantSubscriptions.tenantId, tIds));
       await this.db.delete(tenants).where(inArray(tenants.id, tIds));
+    }
+    if (this.planIds.length) {
+      await this.db
+        .delete(tenantSubscriptions)
+        .where(inArray(tenantSubscriptions.planId, this.planIds));
+      await this.db
+        .delete(auditLogs)
+        .where(inArray(auditLogs.entityId, this.planIds));
+      await this.db.delete(plans).where(inArray(plans.id, this.planIds));
     }
     await this.pool.end();
   }

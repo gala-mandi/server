@@ -32,6 +32,8 @@ import { diffChanges } from '../../database/audit/audit-diff';
 import { normalizePhone } from '../auth/identifier';
 import { defaultCommodityRows } from '../commodities/default-commodities';
 import { PasswordService } from '../auth/password.service';
+import { startTrial } from '../subscriptions/subscription-queries';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import type {
   CreateTenantInput,
   ListTenantsQuery,
@@ -94,6 +96,7 @@ export class TenantsService {
   constructor(
     private readonly platform: PlatformDatabase,
     private readonly passwords: PasswordService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   list(query: ListTenantsQuery) {
@@ -120,13 +123,17 @@ export class TenantsService {
           .offset((query.page - 1) * query.limit),
         tx.select({ total: count() }).from(tenants).where(where),
       ]);
-      const counts = await this.userCounts(
-        tx,
-        rows.map((r) => r.id),
-      );
+      const ids = rows.map((r) => r.id);
+      const [counts, plans] = await Promise.all([
+        this.userCounts(tx, ids),
+        this.subscriptions.briefsFor(tx, ids),
+      ]);
 
       return {
-        data: rows.map((row) => this.toSummary(row, counts.get(row.id) ?? 0)),
+        data: rows.map((row) => ({
+          ...this.toSummary(row, counts.get(row.id) ?? 0),
+          subscription: plans.get(row.id) ?? null,
+        })),
         meta: { page: query.page, limit: query.limit, total },
       };
     });
@@ -138,7 +145,7 @@ export class TenantsService {
 
   /**
    * Shop + owner (temporary password) + default settings + default
-   * commodity list, all or nothing.
+   * commodity list + a Trial subscription, all or nothing.
    */
   async create(
     input: CreateTenantInput,
@@ -226,6 +233,7 @@ export class TenantsService {
         .insert(commodities)
         .values(defaultCommodityRows(tenant.id))
         .returning();
+      const trial = await startTrial(tx, tenant.id);
 
       await audit({
         tenantId: tenant.id,
@@ -247,6 +255,13 @@ export class TenantsService {
         entityId: tenant.id,
         action: 'create',
         after: settings,
+      });
+      await audit({
+        tenantId: tenant.id,
+        entity: 'tenant_subscriptions',
+        entityId: trial.id,
+        action: 'create',
+        after: trial,
       });
       for (const row of starter) {
         await audit({
@@ -436,8 +451,10 @@ export class TenantsService {
       .orderBy(asc(users.createdAt))
       .limit(1);
     const counts = await this.userCounts(tx, [id]);
+    const subscription = await this.subscriptions.viewFor(tx, id);
     return {
       ...this.toSummary(row, counts.get(id) ?? 0),
+      subscription,
       email: row.email,
       address: row.address,
       logoUrl: row.logoUrl,
