@@ -252,20 +252,22 @@ describe('Shops admin /admin/tenants (e2e)', () => {
         .where(eq(commodities.tenantId, tenant.id));
 
       expect(
-        rows.slice(0, 3).map((r) => [r.entity, r.entityId, r.action, r.userId]),
+        rows.slice(0, 4).map((r) => [r.entity, r.entityId, r.action, r.userId]),
       ).toEqual([
         ['tenants', tenant.id, 'create', adminId],
         ['users', tenant.owner!.id, 'create', adminId],
         ['tenant_settings', tenant.id, 'create', adminId],
+        // Every new shop starts on the Trial plan.
+        ['tenant_subscriptions', tenant.subscription!.id, 'create', adminId],
       ]);
-      // One create row per default commodity, after the settings row.
+      // One create row per default commodity, after the subscription row.
       expect(starter).toHaveLength(DEFAULT_COMMODITIES.length);
-      expect(rows.slice(3).map((r) => [r.entity, r.action, r.userId])).toEqual(
+      expect(rows.slice(4).map((r) => [r.entity, r.action, r.userId])).toEqual(
         starter.map(() => ['commodities', 'create', adminId]),
       );
       expect(
         rows
-          .slice(3)
+          .slice(4)
           .map((r) => r.entityId)
           .sort(),
       ).toEqual(starter.map((c) => c.id).sort());
@@ -707,6 +709,7 @@ describe('Shops admin /admin/tenants (e2e)', () => {
           'status',
           'userCount',
           'createdAt',
+          'subscription',
         ].sort(),
       );
       expect(names(body)).not.toContain(deleted.name);

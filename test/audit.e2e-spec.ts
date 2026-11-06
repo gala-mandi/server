@@ -73,7 +73,11 @@ function sourceFiles(dir: string): string[] {
 const HARD_DELETE =
   /\b(?:tx|trx|db|this\.db|this\.tx)\s*\.\s*delete\s*\(|\bdelete\s+from\b/i;
 // Token / OTP cleanup in the auth module would be allowed here; none exists today.
-const HARD_DELETE_ALLOWLIST: string[] = [];
+const HARD_DELETE_ALLOWLIST: string[] = [
+  // Platform table without deleted_at (schema.dbml): a plan no subscription
+  // ever used is deleted (audited); a used one is only deactivated.
+  'src/modules/subscriptions/plans.service.ts',
+];
 
 describe('Audit log & soft delete (e2e)', () => {
   let app: INestApplication<App>;

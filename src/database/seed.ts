@@ -9,8 +9,15 @@ import { count, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
-import { commodities, tenantSettings, tenants, users } from './schema';
+import {
+  commodities,
+  tenantSettings,
+  tenantSubscriptions,
+  tenants,
+  users,
+} from './schema';
 import { defaultCommodityRows } from '../modules/commodities/default-commodities';
+import { startTrial } from '../modules/subscriptions/subscription-queries';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -76,6 +83,13 @@ async function main(): Promise<void> {
     if (existing === 0) {
       await db.insert(commodities).values(defaultCommodityRows(tenant.id));
     }
+
+    // A Trial plan, as every new shop gets one (only if it has none).
+    const [{ plans: subscriptions }] = await db
+      .select({ plans: count() })
+      .from(tenantSubscriptions)
+      .where(eq(tenantSubscriptions.tenantId, tenant.id));
+    if (subscriptions === 0) await startTrial(db, tenant.id);
 
     await db
       .insert(users)
