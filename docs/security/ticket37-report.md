@@ -3,8 +3,8 @@
 Date: 7 Nov 2026 · Branch `test/security-load` in `server`, `web` and `admin`.
 
 **Result: no open High or Critical issue.** Everything the scanners and `npm audit` rated High was
-fixed; the manual review found one Medium (open redirect after login) and two Low issues worth
-fixing, all fixed with tests. The peak-load scenario passed (p95 save 333 ms, 0 errors, no
+fixed. The review also found two Medium issues in web/admin (open redirect after login, missing
+security headers / CSP) and one Low in the API (oversized body answered 500), all fixed with tests. The peak-load scenario passed (p95 save 333 ms, 0 errors, no
 duplicate or missing bill numbers) and every cross-shop attempt was blocked.
 
 | Scenario (ticket) | Result |
