@@ -30,6 +30,11 @@ export const sessionSchema = z.object({
   user: userSchema,
 });
 
+/** The mobile app (`X-Client: mobile`) gets the refresh token in the body. */
+export const mobileSessionSchema = sessionSchema.extend({
+  refreshToken: z.string(),
+});
+
 export const revokedSessionsSchema = z.object({
   revokedSessions: z.number().int(),
 });
@@ -44,6 +49,7 @@ export type UserDto = z.infer<typeof userSchema>;
 
 export class UserResponseDto extends createZodDto(userSchema) {}
 export class SessionDto extends createZodDto(sessionSchema) {}
+export class MobileSessionDto extends createZodDto(mobileSessionSchema) {}
 export class RevokedSessionsDto extends createZodDto(revokedSessionsSchema) {}
 export class ForgotPasswordResultDto extends createZodDto(
   forgotPasswordResultSchema,

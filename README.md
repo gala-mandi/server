@@ -90,6 +90,7 @@ test/                     integration and e2e tests
 
 - **Access token:** JWT (HS256), 15 minutes, payload `{ sub, tenantId, role, sid }`. Clients keep it in memory.
 - **Refresh token:** random, stored as a SHA-256 hash in `refresh_tokens`, sent as an `httpOnly`, `SameSite=Lax` cookie (`Secure` outside development). 7 days with "keep me signed in", otherwise a browser-session cookie. Each refresh revokes the old token; using a rotated token again ends every session of that user.
+- **Mobile app:** the app sends `X-Client: mobile` on `login`, `refresh`, `logout` and `logout-all`. Then no cookie is set or read: `login` and `refresh` return `refreshToken` in the JSON body, and `refresh`/`logout` take `{ "refreshToken": "..." }` in the body. Rotation, reuse detection, expiry, disabled-account and suspended-shop rules are the same (same service code). Without the header (the web) nothing changes: the token never appears in a body and a body token is ignored. The app keeps the token in the phone's secure storage.
 - **Errors:** `401 Invalid credentials` (same for unknown users), `403` with `code: ACCOUNT_DISABLED` or `TENANT_SUSPENDED`, `401` with `code: SESSION_EXPIRED`, `400` with `code: INVALID_OTP`.
 - **Brute force:** `LOGIN_THROTTLE_LIMIT` (5) tries per minute for each IP + phone/email on login and forgot-password, then `429` with `Retry-After`.
 - **Logs:** every login, logout, failed try, refresh, lock-out and reset goes to `auth_logs`. Passwords, tokens and codes are never logged.

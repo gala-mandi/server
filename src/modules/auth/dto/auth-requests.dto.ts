@@ -37,7 +37,13 @@ export const resetPasswordSchema = z.object({
   newPassword,
 });
 
+/** Body of refresh/logout from the mobile app (`X-Client: mobile`). */
+export const mobileRefreshSchema = z.object({
+  refreshToken: z.string().trim().max(200).optional(),
+});
+
 export class LoginDto extends createZodDto(loginSchema) {}
+export class MobileRefreshDto extends createZodDto(mobileRefreshSchema) {}
 export class ChangePasswordDto extends createZodDto(changePasswordSchema) {}
 export class ForgotPasswordDto extends createZodDto(forgotPasswordSchema) {}
 export class ResetPasswordDto extends createZodDto(resetPasswordSchema) {}

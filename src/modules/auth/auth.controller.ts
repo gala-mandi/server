@@ -16,13 +16,17 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiBearerAuth,
+  ApiBody,
   ApiCookieAuth,
+  ApiExtraModels,
+  ApiHeader,
   ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiTags,
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
@@ -38,15 +42,23 @@ import { AuthThrottleGuard } from './auth-throttle.guard';
 import { AcceptInviteService } from './accept-invite.service';
 import { AuthService, type SessionResult } from './auth.service';
 import {
+  bodyRefreshToken,
+  CLIENT_HEADER,
+  isMobileClient,
+  MOBILE_CLIENT,
+} from './client-type';
+import {
   AcceptInviteDto,
   ChangePasswordDto,
   ForgotPasswordDto,
   LoginDto,
+  MobileRefreshDto,
   ResetPasswordDto,
 } from './dto/auth-requests.dto';
 import {
   AcceptedInviteDto,
   ForgotPasswordResultDto,
+  MobileSessionDto,
   RevokedSessionsDto,
   SessionDto,
   UserResponseDto,
@@ -59,7 +71,29 @@ import {
 } from './refresh-cookie';
 import { requestMeta } from './request-meta';
 
+/** Documents the mobile mode on login, refresh and logout. */
+const ClientHeader = () =>
+  ApiHeader({
+    name: CLIENT_HEADER,
+    required: false,
+    enum: [MOBILE_CLIENT],
+    description:
+      'Send `mobile` from the mobile app: the refresh token then travels in the JSON body instead of the httpOnly cookie.',
+  });
+
+/** Web gets SessionDto + cookie; the mobile app gets MobileSessionDto. */
+const sessionResponse = (description: string) => ({
+  description,
+  schema: {
+    oneOf: [
+      { $ref: getSchemaPath(SessionDto) },
+      { $ref: getSchemaPath(MobileSessionDto) },
+    ],
+  },
+});
+
 @ApiTags('auth')
+@ApiExtraModels(SessionDto, MobileSessionDto)
 // Signing in and out and passwords work in read-only mode too.
 @AllowReadOnly()
 @Controller('auth')
@@ -83,7 +117,12 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthThrottleGuard)
-  @ApiOkResponse({ type: SessionDto, description: 'Sets the refresh cookie' })
+  @ClientHeader()
+  @ApiOkResponse(
+    sessionResponse(
+      'Web: sets the refresh cookie. Mobile: refreshToken in the body, no cookie.',
+    ),
+  )
   @ApiBadRequestResponse({ description: 'Field errors' })
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
   @ApiForbiddenResponse({ description: 'ACCOUNT_DISABLED | TENANT_SUSPENDED' })
@@ -92,30 +131,49 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<SessionDto> {
-    return this.sendSession(res, await this.auth.login(dto, requestMeta(req)));
+  ): Promise<SessionDto | MobileSessionDto> {
+    return this.sendSession(
+      req,
+      res,
+      await this.auth.login(dto, requestMeta(req)),
+    );
   }
 
   @Post('refresh')
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiCookieAuth(REFRESH_COOKIE)
-  @ApiOkResponse({
-    type: SessionDto,
-    description: 'Rotates the refresh cookie',
+  @ClientHeader()
+  @ApiBody({
+    type: MobileRefreshDto,
+    required: false,
+    description: 'Mobile only; the web sends no body (cookie)',
   })
+  @ApiOkResponse(
+    sessionResponse(
+      'Rotates the refresh token (web: cookie; mobile: refreshToken in the body)',
+    ),
+  )
+  @ApiBadRequestResponse({ description: 'Mobile: malformed body' })
   @ApiUnauthorizedResponse({ description: 'SESSION_EXPIRED' })
   @ApiForbiddenResponse({ description: 'ACCOUNT_DISABLED | TENANT_SUSPENDED' })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<SessionDto> {
+  ): Promise<SessionDto | MobileSessionDto> {
+    if (isMobileClient(req)) {
+      const session = await this.auth.refresh(
+        bodyRefreshToken(req),
+        requestMeta(req),
+      );
+      return this.sendSession(req, res, session);
+    }
     try {
       const session = await this.auth.refresh(
         readCookie(req.headers.cookie, REFRESH_COOKIE),
         requestMeta(req),
       );
-      return this.sendSession(res, session);
+      return this.sendSession(req, res, session);
     } catch (error) {
       clearRefreshCookie(res, this.cookie);
       throw error;
@@ -126,11 +184,24 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiCookieAuth(REFRESH_COOKIE)
-  @ApiNoContentResponse({ description: 'Ends this session, clears the cookie' })
+  @ClientHeader()
+  @ApiBody({
+    type: MobileRefreshDto,
+    required: false,
+    description: 'Mobile only; the web sends no body (cookie)',
+  })
+  @ApiNoContentResponse({
+    description: 'Ends this session (web: also clears the cookie)',
+  })
+  @ApiBadRequestResponse({ description: 'Mobile: malformed body' })
   async logout(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
+    if (isMobileClient(req)) {
+      await this.auth.logout(bodyRefreshToken(req), requestMeta(req));
+      return;
+    }
     await this.auth.logout(
       readCookie(req.headers.cookie, REFRESH_COOKIE),
       requestMeta(req),
@@ -142,6 +213,7 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @Roles(...ALL_ROLES)
   @ApiBearerAuth()
+  @ClientHeader()
   @ApiNoContentResponse({ description: 'Ends every session of the user' })
   @ApiUnauthorizedResponse()
   async logoutAll(
@@ -150,7 +222,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
     await this.auth.logoutAll(user, requestMeta(req));
-    clearRefreshCookie(res, this.cookie);
+    if (!isMobileClient(req)) clearRefreshCookie(res, this.cookie);
   }
 
   @Get('me')
@@ -229,7 +301,20 @@ export class AuthController {
     return this.acceptInvites.accept(dto, requestMeta(req));
   }
 
-  private sendSession(res: Response, session: SessionResult): SessionDto {
+  private sendSession(
+    req: Request,
+    res: Response,
+    session: SessionResult,
+  ): SessionDto | MobileSessionDto {
+    if (isMobileClient(req)) {
+      // No cookie: the app keeps the token in the phone's secure storage.
+      return {
+        accessToken: session.accessToken,
+        expiresIn: session.expiresIn,
+        user: session.user,
+        refreshToken: session.refreshToken,
+      };
+    }
     setRefreshCookie(
       res,
       session.refreshToken,
