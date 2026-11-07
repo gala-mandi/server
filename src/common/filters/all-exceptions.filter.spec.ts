@@ -101,4 +101,40 @@ describe('AllExceptionsFilter', () => {
       500,
     );
   });
+
+  it('keeps the 413 of a body over the size limit (body parser)', () => {
+    const { filter, reply, host, response } = setup();
+    // What raw-body / body-parser throw (http-errors).
+    const error = Object.assign(new Error('request entity too large'), {
+      status: 413,
+      statusCode: 413,
+      expose: true,
+      type: 'entity.too.large',
+    });
+
+    filter.catch(error, host);
+
+    expect(reply).toHaveBeenCalledWith(
+      response,
+      { statusCode: 413, message: 'The request body is too large' },
+      413,
+    );
+  });
+
+  it('still answers 500 for a server-side error that carries a status', () => {
+    const { filter, reply, host, response } = setup();
+    const error = Object.assign(new Error('internal'), {
+      status: 500,
+      expose: false,
+      type: 'stream.encoding.set',
+    });
+
+    filter.catch(error, host);
+
+    expect(reply).toHaveBeenCalledWith(
+      response,
+      { statusCode: 500, message: 'Internal server error' },
+      500,
+    );
+  });
 });

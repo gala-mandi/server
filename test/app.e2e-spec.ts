@@ -33,6 +33,20 @@ describe('App (e2e)', () => {
     expect(JSON.stringify(res.body)).not.toMatch(/at .+\.(ts|js):\d+/);
   });
 
+  it('answers 413, not 500, for a JSON body over the size limit', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/login')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ identifier: 'a'.repeat(200_000), password: 'x' }))
+      .expect(413)
+      .expect('Content-Type', /json/);
+
+    expect(res.body).toEqual({
+      statusCode: 413,
+      message: 'The request body is too large',
+    });
+  });
+
   it('serves the OpenAPI document behind /docs', async () => {
     const res = await request(app.getHttpServer())
       .get('/docs-json')
