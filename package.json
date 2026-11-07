@@ -8,6 +8,7 @@
   "scripts": {
     "build": "nest build",
     "db:generate": "drizzle-kit generate",
+    "db:check-dbml": "jest --runInBand schema-dbml",
     "db:migrate": "drizzle-kit migrate",
     "dev": "nest start --watch",
     "format": "prettier --write .",
@@ -54,6 +55,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@dbml/core": "^10.3.1",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",
