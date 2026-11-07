@@ -39,20 +39,57 @@ Never commit `.env`.
 
 ## Scripts
 
-| Script                                    | What it does                                                                      |
-| ----------------------------------------- | --------------------------------------------------------------------------------- |
-| `npm run dev`                             | Start the API in watch mode                                                       |
-| `npm run build`                           | Compile to `dist/`                                                                |
-| `npm run lint` / `npm run lint:fix`       | ESLint                                                                            |
-| `npm run format` / `npm run format:check` | Prettier                                                                          |
-| `npm run typecheck`                       | TypeScript, no output                                                             |
-| `npm test`                                | Unit tests (Jest)                                                                 |
-| `npm run test:e2e`                        | Integration + e2e tests (Jest + supertest) against the Postgres in `DATABASE_URL` |
-| `npm run db:generate`                     | Generate a migration from the Drizzle schema                                      |
-| `npm run db:migrate`                      | Apply migrations                                                                  |
-| `npm run db:seed`                         | Create the dev super-admin and the Demo Mandi owner (safe to re-run)              |
+| Script                                    | What it does                                                                                  |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `npm run dev`                             | Start the API in watch mode                                                                   |
+| `npm run build`                           | Compile to `dist/`                                                                            |
+| `npm run lint` / `npm run lint:fix`       | ESLint                                                                                        |
+| `npm run format` / `npm run format:check` | Prettier                                                                                      |
+| `npm run typecheck`                       | TypeScript, no output                                                                         |
+| `npm test`                                | Unit tests (Jest)                                                                             |
+| `npm run test:e2e`                        | Integration + e2e tests (Jest + supertest) against the Postgres in `DATABASE_URL`             |
+| `npm run db:generate`                     | Generate a migration from the Drizzle schema                                                  |
+| `npm run db:migrate`                      | Apply migrations                                                                              |
+| `npm run db:seed`                         | Create the dev super-admin and the Demo Mandi owner (safe to re-run)                          |
+| `npm run load:*`                          | Load test with k6 (seed, smoke, 10-minute run, checks) — see [Load testing](#load-testing-k6) |
 
 A Husky pre-commit hook runs ESLint and Prettier on staged files (lint-staged). CI (`.github/workflows/ci.yml`) runs lint, format check, type-check, unit tests, migrations, e2e tests and the build on every pull request.
+
+## Load testing (k6)
+
+The busy-hours test from the launch checklist: **50 shops × 5 operators save purchases for
+10 minutes**; it passes when the p95 of the save request is under 500 ms and no save fails.
+Afterwards `load:verify` checks in SQL that no shop has a bill number twice and that there are
+no gaps. k6 runs from its Docker image (`grafana/k6`), so nothing is installed; the scripts are
+in `load/`. Results of the launch run: `docs/security/ticket37-report.md`.
+
+| Script                   | What it does                                                                                    |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| `npm run load:seed`      | Creates the shops `load-shop-001…050`, each with an owner, 5 operators, 20 kissans, commodities |
+| `npm run load:smoke`     | The same test for 1 minute; run it first                                                        |
+| `npm run load:test`      | The 10-minute test; the k6 summary is written to `load/results/summary.json`                    |
+| `npm run load:verify`    | SQL checks after a run: duplicate bill numbers, gaps, purchases without khata lines             |
+| `npm run load:isolation` | Cross-shop probe against the running API (another shop's ids → 404, forged tokens → 401)        |
+
+```bash
+# A test database only: the seed gives every load user the same known password.
+export LOAD_TEST_PASSWORD='pick-one-for-this-run'
+npm run db:migrate && npm run load:seed
+npm run build && NODE_ENV=production node dist/main      # in another terminal
+export API_URL=http://host.docker.internal:4000          # the API as seen from the k6 container
+npm run load:smoke && npm run load:test && npm run load:verify
+```
+
+- **Never against production.** `load:seed` refuses a `DATABASE_URL` that is not on this machine
+  unless `LOAD_SEED_ALLOW_REMOTE=yes` (for a test server).
+- **Pace:** each operator saves one parchi every 45–75 s (`THINK_MIN`/`THINK_MAX`), all 250 at
+  once, starting at random moments. Lower them for a stress run to find the ceiling.
+- **Rate limits are not relaxed.** Each operator signs in once (in k6 `setup()`), and each shop
+  sends its own client address in `X-Forwarded-For`, the way the host's proxy does
+  (`trust proxy = 1`), so every shop has its own 100-requests-a-minute budget, as in real use.
+  In a stress run keep `5 × 60 / THINK_MIN` under 100.
+- Other knobs: `LOAD_SHOPS`, `LOAD_OPERATORS`, `DURATION` (env, passed to k6).
+- `load/results/` is git-ignored: the k6 summary also holds the access tokens from `setup()`.
 
 ## Project layout
 

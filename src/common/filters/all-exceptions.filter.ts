@@ -65,11 +65,46 @@ export class AllExceptionsFilter implements ExceptionFilter {
       };
     }
 
+    const clientError = bodyParserError(exception);
+    if (clientError) return clientError;
+
     return {
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
       message: 'Internal server error',
     };
   }
+}
+
+/** Fixed texts for the body-parser errors a client can cause. */
+const BODY_ERRORS: Record<string, string> = {
+  'entity.too.large': 'The request body is too large',
+  'encoding.unsupported': 'Unsupported content encoding',
+  'charset.unsupported': 'Unsupported charset',
+  'request.aborted': 'The request was aborted',
+};
+
+/**
+ * Express's body parser rejects a request before Nest sees it (e.g. a body
+ * over the 100 kB limit → 413). Those errors are the client's (4xx), not a
+ * server failure: keep their status, with a fixed message.
+ */
+function bodyParserError(exception: unknown): ErrorBody | null {
+  if (typeof exception !== 'object' || exception === null) return null;
+  const { status, type, expose } = exception as {
+    status?: unknown;
+    type?: unknown;
+    expose?: unknown;
+  };
+  if (
+    expose !== true ||
+    typeof status !== 'number' ||
+    status < 400 ||
+    status > 499 ||
+    typeof type !== 'string'
+  ) {
+    return null;
+  }
+  return { statusCode: status, message: BODY_ERRORS[type] ?? 'Bad request' };
 }
 
 function toFieldErrors(error: ZodError): FieldError[] {

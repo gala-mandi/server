@@ -22,3 +22,6 @@ coverage/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# k6 results (load:test); the report keeps the numbers
+/load/results/
