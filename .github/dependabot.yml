@@ -1,0 +1,16 @@
+# Weekly pull requests for vulnerable and outdated npm packages
+# (security updates are raised as soon as an advisory is published).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      # Patch and minor updates of dev tools in one PR, to keep the noise down.
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
