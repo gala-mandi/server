@@ -71,4 +71,20 @@ export default tseslint.config(
       'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },
+  {
+    // k6 scripts (load tests): plain JS run by k6, not by Node. Last, so the
+    // type-aware rules above stay off for them.
+    files: ['load/**/*.js'],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      ...tseslint.configs.disableTypeChecked.languageOptions,
+      sourceType: 'module',
+      globals: {
+        __ENV: 'readonly',
+        __ITER: 'readonly',
+        __VU: 'readonly',
+        crypto: 'readonly',
+      },
+    },
+  },
 );
