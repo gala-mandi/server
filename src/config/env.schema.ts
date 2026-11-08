@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+/**
+ * Browser origins, matched exactly against the `Origin` header. A value
+ * written with a path or trailing slash (`https://x.app/`) is reduced to its
+ * origin (`https://x.app`); `*` is not a URL, so a wildcard is refused.
+ */
 const commaSeparatedUrls = z
   .string()
   .min(1)
@@ -9,7 +14,19 @@ const commaSeparatedUrls = z
       .map((origin) => origin.trim())
       .filter(Boolean),
   )
-  .pipe(z.array(z.url()).min(1));
+  .pipe(
+    z
+      .array(
+        z.url({ protocol: /^https?$/ }).transform((url) => new URL(url).origin),
+      )
+      .min(1),
+  );
+
+/** Unset or empty means "off". */
+const optionalText = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().min(1).optional(),
+);
 
 export const envSchema = z.object({
   NODE_ENV: z
@@ -36,6 +53,15 @@ export const envSchema = z.object({
   OTP_SECRET: z.string().min(32),
   LOGIN_THROTTLE_LIMIT: z.coerce.number().int().positive().default(5),
   LOGIN_THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  /** Sentry error tracking; off unless set. Read by src/instrument.ts. */
+  SENTRY_DSN: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.url({ protocol: /^https?$/ }).optional(),
+  ),
+  /** Defaults to NODE_ENV. */
+  SENTRY_ENVIRONMENT: optionalText,
+  /** Defaults to a commit SHA from the host's variables, when it has one. */
+  SENTRY_RELEASE: optionalText,
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
     .default('info'),

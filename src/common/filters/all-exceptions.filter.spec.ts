@@ -4,10 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
+import * as Sentry from '@sentry/nestjs';
 import { ThrottlerException } from '@nestjs/throttler';
 import { ZodValidationException } from 'nestjs-zod';
 import { z } from 'zod';
 import { AllExceptionsFilter } from './all-exceptions.filter';
+
+jest.mock('@sentry/nestjs', () => ({ captureException: jest.fn() }));
 
 function setup() {
   const reply = jest.fn();
@@ -136,5 +139,28 @@ describe('AllExceptionsFilter', () => {
       { statusCode: 500, message: 'Internal server error' },
       500,
     );
+  });
+
+  describe('Sentry', () => {
+    beforeEach(() => jest.mocked(Sentry.captureException).mockClear());
+
+    it('reports server errors (5xx)', () => {
+      const { filter, host } = setup();
+      const error = new Error('boom');
+
+      filter.catch(error, host);
+
+      expect(Sentry.captureException).toHaveBeenCalledWith(error);
+    });
+
+    it('does not report client errors (4xx)', () => {
+      const { filter, host } = setup();
+
+      filter.catch(new NotFoundException('Cannot GET /nope'), host);
+      filter.catch(new BadRequestException('bad'), host);
+      filter.catch(new ThrottlerException(), host);
+
+      expect(Sentry.captureException).not.toHaveBeenCalled();
+    });
   });
 });

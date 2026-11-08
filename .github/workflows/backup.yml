@@ -1,0 +1,99 @@
+# Daily encrypted database backup. See docs/ops/runbook.md#backups.
+#
+# Secrets (Settings > Secrets and variables > Actions):
+#   DATABASE_URL         production database (read access is enough)
+#   BACKUP_PASSPHRASE    encryption passphrase; keep a copy outside GitHub
+# Optional, to also copy each backup to S3-compatible storage (e.g. Cloudflare R2):
+#   BACKUP_S3_BUCKET, BACKUP_S3_ENDPOINT, BACKUP_S3_ACCESS_KEY_ID,
+#   BACKUP_S3_SECRET_ACCESS_KEY (and BACKUP_S3_REGION, default "auto")
+#
+# A failed run e-mails the person who last changed this schedule (GitHub's
+# default for scheduled workflows), so a broken backup is never silent.
+name: Backup
+
+on:
+  schedule:
+    # 21:30 UTC = 02:30 Asia/Karachi, after the mandi day.
+    - cron: '30 21 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      HAS_S3: ${{ secrets.BACKUP_S3_BUCKET != '' }}
+
+    steps:
+      - name: Check secrets
+        id: secrets
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::warning title=Backup skipped::Set the DATABASE_URL and BACKUP_PASSPHRASE repository secrets to turn on daily backups (docs/ops/runbook.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+
+      # pg_dump must be at least the server's major version. Use exactly the
+      # server's version, so the host's own pg_restore can read the dump too.
+      - name: Install the matching PostgreSQL client
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common >/dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          version=$(psql --no-psqlrc -tAc 'show server_version_num' "$DATABASE_URL")
+          major=$((version / 10000))
+          echo "Database server: PostgreSQL $major ($version)"
+          sudo apt-get install -y -qq "postgresql-client-$major" >/dev/null
+          echo "PG_BIN=/usr/lib/postgresql/$major/bin" >> "$GITHUB_ENV"
+
+      - name: Dump, encrypt and check
+        id: backup
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          file=$(scripts/backup.sh backups)
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$file")" >> "$GITHUB_OUTPUT"
+
+      - name: Keep as a workflow artifact (30 days)
+        if: steps.secrets.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.backup.outputs.name }}
+          path: ${{ steps.backup.outputs.file }}
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Copy to object storage
+        if: steps.secrets.outputs.ready == 'true' && env.HAS_S3 == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.BACKUP_S3_REGION || 'auto' }}
+          # R2 and most S3-compatible stores want the classic checksums.
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+        run: |
+          aws s3 cp "${{ steps.backup.outputs.file }}" \
+            "s3://$BUCKET/daily/${{ steps.backup.outputs.name }}" \
+            ${ENDPOINT:+--endpoint-url "$ENDPOINT"} --only-show-errors
+          echo "Copied to s3://$BUCKET/daily/${{ steps.backup.outputs.name }}"
