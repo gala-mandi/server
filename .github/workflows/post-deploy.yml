@@ -1,0 +1,30 @@
+# After every merge to main, EthioDeploy rebuilds the API. This waits for the
+# build, then checks /health. A failed run e-mails the person who pushed.
+# Repository variables (optional): API_URL, DEPLOY_WAIT_SECONDS.
+name: Post-deploy check
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-deploy
+  cancel-in-progress: true
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for the deploy, then check /health
+        env:
+          API_URL: ${{ vars.API_URL || 'https://server-6i08.ethiodeploy.app' }}
+          WAIT_BEFORE: ${{ github.event_name == 'push' && (vars.DEPLOY_WAIT_SECONDS || '300') || '0' }}
+          TIMEOUT: '600'
+        run: scripts/smoke-check.sh "$API_URL/health" '"status":"ok"'
