@@ -7,9 +7,20 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # A NestJS major (12) is a planned upgrade, not a bump: all @nestjs
+      # packages must move together and @nestjs/schedule 12 is ESM-only.
+      - dependency-name: '@nestjs/*'
+        update-types: [version-update:semver-major]
+      # typescript-eslint supports TypeScript < 6.1 only (same rule as web).
+      - dependency-name: typescript
+        versions: ['>=6.1.0']
     commit-message:
       prefix: chore(deps)
     groups:
+      # @nestjs packages pin each other as peers, so they update in one PR.
+      nestjs:
+        patterns: ['@nestjs/*']
       # Patch and minor updates of dev tools in one PR, to keep the noise down.
       dev-dependencies:
         dependency-type: development
