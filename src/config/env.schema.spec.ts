@@ -69,6 +69,29 @@ describe('validateEnv', () => {
     ).toThrow(/CORS_ORIGINS/);
   });
 
+  it('reduces CORS origins to the exact origin and refuses a wildcard', () => {
+    expect(
+      validateEnv({
+        ...validEnv,
+        CORS_ORIGINS:
+          'https://web.example.com/, https://admin.example.com/login',
+      }).CORS_ORIGINS,
+    ).toEqual(['https://web.example.com', 'https://admin.example.com']);
+    expect(() => validateEnv({ ...validEnv, CORS_ORIGINS: '*' })).toThrow(
+      /CORS_ORIGINS/,
+    );
+  });
+
+  it('treats Sentry as off when SENTRY_DSN is unset or empty', () => {
+    expect(validateEnv(validEnv).SENTRY_DSN).toBeUndefined();
+    expect(
+      validateEnv({ ...validEnv, SENTRY_DSN: '' }).SENTRY_DSN,
+    ).toBeUndefined();
+    expect(() => validateEnv({ ...validEnv, SENTRY_DSN: 'not-a-dsn' })).toThrow(
+      /SENTRY_DSN/,
+    );
+  });
+
   it('lists every problem at once', () => {
     let message = '';
     try {

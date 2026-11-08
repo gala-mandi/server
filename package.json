@@ -8,6 +8,7 @@
   "scripts": {
     "build": "nest build",
     "db:generate": "drizzle-kit generate",
+    "db:check-dbml": "jest --runInBand schema-dbml",
     "db:migrate": "drizzle-kit migrate",
     "dev": "nest start --watch",
     "format": "prettier --write .",
@@ -26,6 +27,7 @@
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit",
     "db:seed": "ts-node src/database/seed.ts",
+    "sentry:test": "ts-node scripts/sentry-test.ts",
     "load:seed": "ts-node load/seed.ts",
     "load:smoke": "docker run --rm -i --add-host=host.docker.internal:host-gateway -u \"$(id -u):$(id -g)\" -v \"$PWD/load:/load\" -e API_URL -e LOAD_TEST_PASSWORD -e LOAD_SHOPS -e LOAD_OPERATORS -e DURATION grafana/k6:2.3.0 run -e DURATION=1m /load/purchases.js",
     "load:test": "mkdir -p load/results && docker run --rm -i --add-host=host.docker.internal:host-gateway -u \"$(id -u):$(id -g)\" -v \"$PWD/load:/load\" -e API_URL -e LOAD_TEST_PASSWORD -e LOAD_SHOPS -e LOAD_OPERATORS -e DURATION grafana/k6:2.3.0 run --summary-export=/load/results/summary.json /load/purchases.js",
@@ -42,11 +44,12 @@
     "@nestjs/schedule": "^6.1.3",
     "@nestjs/swagger": "^11.4.7",
     "@nestjs/throttler": "^6.7.1",
+    "@sentry/nestjs": "^11.9.0",
     "argon2": "^0.45.2",
     "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.45.4",
     "helmet": "^8.3.0",
-    "nestjs-cls": "^7.0.1",
+    "nestjs-cls": "^7.0.2",
     "nestjs-pino": "^5.3.1",
     "nestjs-zod": "^5.5.0",
     "passport": "^0.7.0",
@@ -59,6 +62,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@dbml/core": "^10.3.1",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",
@@ -75,7 +79,7 @@
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
-    "globals": "^17.0.0",
+    "globals": "^17.14.0",
     "husky": "^9.1.7",
     "jest": "^30.0.0",
     "lint-staged": "^17.6.0",
@@ -87,7 +91,7 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.20.0"
+    "typescript-eslint": "^8.72.1"
   },
   "overrides": {
     "multer": "2.5.0"
