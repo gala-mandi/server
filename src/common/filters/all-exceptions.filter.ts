@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
+import * as Sentry from '@sentry/nestjs';
 import { ZodValidationException } from 'nestjs-zod';
 import { ZodError } from 'zod';
 
@@ -25,7 +26,8 @@ export interface ErrorBody {
 
 /**
  * Turns every error into `{ statusCode, message, errors? }`.
- * Stack traces are logged, never sent to the client.
+ * Stack traces are logged, never sent to the client. Server errors (5xx)
+ * also go to Sentry when it is set up (SENTRY_DSN); client errors (4xx) don't.
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -42,6 +44,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       this.logger.error(
         exception instanceof Error ? exception.stack : String(exception),
       );
+      // No-op when Sentry is not initialised.
+      Sentry.captureException(exception);
     }
 
     httpAdapter.reply(ctx.getResponse(), body, body.statusCode);
